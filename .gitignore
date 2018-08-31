@@ -1,0 +1,15 @@
+.dub
+docs.json
+__dummy.html
+docs/
+out/
+djinja.so
+djinja.dylib
+djinja.dll
+djinja.a
+djinja.lib
+djinja-test-*
+*.exe
+*.o
+*.obj
+*.lst

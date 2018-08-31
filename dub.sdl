@@ -1,0 +1,10 @@
+name "djinja"
+description ""
+homepage ""
+authors "Maxim Tyapkin"
+copyright "Copyright © 2018, Maxim Tyapkin"
+license "BSD 3-clause"
+
+targetType "library"
+targetPath "out"
+targetName "djinja"
