@@ -28,6 +28,13 @@ enum Type
     Float,
     String,
 
+    LParen,
+    RParen,
+    LSParen,
+    RSParen,
+    LBrace,
+    RBrace,
+
     EOL,
     EOF,
 }
@@ -96,16 +103,48 @@ enum Operator : string
     In = "in",
     Is = "is",
 
+    Assign = "=",
     Filter = "|",
     Concat = "~",
 
-    DivInt = "//",
-    DivFloat = "/",
     Plus = "+",
     Minus = "-",
+
+    DivInt = "//",
+    DivFloat = "/",
     Rem = "%",
     Pow = "**",
     Mul = "*",
+}
+
+
+Operator toOperator(string key)
+{
+    switch (key) with (Operator)
+    {
+        static foreach(member; EnumMembers!Operator)
+        {
+            case member:
+                return member;
+        }
+        default :
+            return cast(Operator)"";
+    }
+}
+
+
+bool isCmpOperator(Operator op)
+{
+    import std.algorithm : among;
+
+    return cast(bool)op.among(
+            Operator.Eq,
+            Operator.NotEq,
+            Operator.LessEq,
+            Operator.GreaterEq,
+            Operator.Less,
+            Operator.Greater
+        );
 }
 
 
@@ -162,7 +201,7 @@ struct Lexer(
 
     Token nextToken()
     {
-        // Try to return raw data
+        // Try to read raw data
         if (_isReadingRaw)
         {
             auto raw = skipRaw();
@@ -234,8 +273,7 @@ struct Lexer(
             case 'A': .. case 'Z':
             case '_':
                 auto ident = popIdent();
-                auto kw = ident.toKeyword;
-                if (kw != Keyword.Unknown)
+                if (ident.toKeyword != Keyword.Unknown)
                     return Token(Type.Keyword, ident);
                 else
                     return Token(Type.Ident, ident);
@@ -249,6 +287,12 @@ struct Lexer(
             case '\'':
                 return Token(Type.String, popString());
                 
+            case '(': return Token(Type.LParen, [pop]);
+            case ')': return Token(Type.RParen, [pop]);
+            case '[': return Token(Type.LSParen, [pop]);
+            case ']': return Token(Type.RSParen, [pop]);
+            case '{': return Token(Type.LBrace, [pop]);
+            case '}': return Token(Type.RBrace, [pop]);
 
             default:
                 return Token(Type.Unknown, [pop]);
@@ -365,6 +409,9 @@ private:
                     }
                     else
                         return Token(type, number);
+                    break;
+                case '_':
+                    pop();
                     break;
                 default:
                     return Token(type, number);

@@ -5,6 +5,8 @@ authors "Maxim Tyapkin"
 copyright "Copyright © 2018, Maxim Tyapkin"
 license "BSD 3-clause"
 
+dependency "uninode" version="~>0.0.1-beta.2"
+
 targetType "library"
 targetPath "out"
 targetName "djinja"
