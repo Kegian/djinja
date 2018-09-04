@@ -77,13 +77,18 @@ class Render(T) : IVisitor
         _parser.parseTree();
 
         //TODO just test
+        struct Cond
+        {
+            long a;
+            bool c;
+        }
         struct Foo
         {
             long ident;
-            long cond;
+            Cond cond;
             long ab;
         }
-        auto data = Foo(1,2,3);        
+        auto data = Foo(1,Cond(2, false),3);        
         _context = new Context(data.serializeToUniNode);
     }
 
@@ -172,7 +177,15 @@ class Render(T) : IVisitor
 
     override void visit(IdentNode node)
     {
-        push(_context.get(node.name));
+        auto curr = _context.get(node.name);
+
+        foreach (attr; node.subNames)
+            if (attr in curr)
+                curr = curr[attr];
+            else
+                throw new JinjaParserException("Unknown attribute %s".fmt(attr));
+
+        push(curr);
     }
 
     override void visit(IfNode node)

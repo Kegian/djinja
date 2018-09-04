@@ -35,6 +35,8 @@ enum Type
     LBrace,
     RBrace,
 
+    Dot,
+
     EOL,
     EOF,
 }
@@ -293,6 +295,7 @@ struct Lexer(
             case ']': return Token(Type.RSParen, [pop]);
             case '{': return Token(Type.LBrace, [pop]);
             case '}': return Token(Type.RBrace, [pop]);
+            case '.': return Token(Type.Dot, [pop]);
 
             default:
                 return Token(Type.Unknown, [pop]);

@@ -150,10 +150,12 @@ class NumNode : Node
 class IdentNode : Node
 {
     string name;
+    string[] subNames;
 
-    this(string name)
+    this(string name, string[] subNames)
     {
         this.name = name;
+        this.subNames = subNames;
     }
 
     mixin AcceptVisitor;

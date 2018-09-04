@@ -114,7 +114,8 @@ private:
 
     Node parseIf()
     {
-        pop(Keyword.If);
+        // If or ElIf
+        pop(/*Keyword.If*/);
         auto cond = parseOrExpr();
         pop(Type.StmtEnd);
 
@@ -123,10 +124,27 @@ private:
         //TODO check else && elifs
 
         pop(Type.StmtBegin);
-        pop(Keyword.EndIf);
-        pop(Type.StmtEnd);
 
-        return new IfNode(cond, then, null);
+        switch (front.value) with (Keyword)
+        {
+            case ElIf:
+                auto other = parseIf();
+                return new IfNode(cond, then, other);
+            case Else:
+                pop(Keyword.Else);
+                pop(Type.StmtEnd);
+                auto other = parseStatementBlock();
+                pop(Type.StmtBegin);
+                pop(Keyword.EndIf);
+                pop(Type.StmtEnd);
+                return new IfNode(cond, then, other);
+            case EndIf:
+                pop(Keyword.EndIf);
+                pop(Type.StmtEnd);
+                return new IfNode(cond, then, null);
+            default:
+                throw new JinjaParserException("Enexppected token %s".fmt(front.value));
+        }
     }
 
     /**
@@ -228,7 +246,7 @@ private:
 
     /**
       * Parse factor:
-      * factor = (INTEGER|FLOAT|IDENT|LPAREN OrExpr RPAREN)
+      * factor = (INTEGER|FLOAT|ident|LPAREN OrExpr RPAREN)
       */
     Node parseFactor()
     {
@@ -241,7 +259,7 @@ private:
                 return new NumNode(pop.value.to!double);
 
             case Ident:
-                return new IdentNode(pop.value);
+                return parseIdent();
 
             case LParen:
                 pop(LParen);
@@ -251,6 +269,52 @@ private:
 
             default:
                 throw new JinjaParserException("Unexpected token while parsing expression: %s".fmt(front.value));
+        }
+    }
+
+    /**
+      * Parse ident:
+      * ident = IDENT(DOT IDENT| LSPAREN STR LRPAREN IDENT)?
+      */
+    Node parseIdent()
+    {
+        string parseName()
+        {
+            string name;
+            switch (front.type) with (Type)
+            {
+                case Ident:
+                    name = pop(Ident).value;
+                    break;
+                case LSParen:
+                    pop(LSParen);
+                    name = pop(String).value;
+                    pop(RSParen);
+                    break;
+                default:
+                    throw new JinjaParserException("Unexpected token %s".fmt(front.type));
+            }
+            return name;
+        }
+        string name = parseName();
+        string[] subNames = [];
+
+        while (true)
+        {
+            switch (front.type) with (Type)
+            {
+                case Dot:
+                    pop(Dot);
+                    subNames ~= pop(Ident).value;
+                    break;
+                case LSParen:
+                    pop(LSParen);
+                    subNames ~= pop(String).value;
+                    pop(RSParen);
+                    break;
+                default:
+                    return new IdentNode(name, subNames);
+            }
         }
     }
 
