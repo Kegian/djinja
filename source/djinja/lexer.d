@@ -36,6 +36,7 @@ enum Type
     RBrace,
 
     Dot,
+    Comma,
 
     EOL,
     EOF,
@@ -296,6 +297,7 @@ struct Lexer(
             case '{': return Token(Type.LBrace, [pop]);
             case '}': return Token(Type.RBrace, [pop]);
             case '.': return Token(Type.Dot, [pop]);
+            case ',': return Token(Type.Comma, [pop]);
 
             default:
                 return Token(Type.Unknown, [pop]);

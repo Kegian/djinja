@@ -41,7 +41,8 @@ class Printer : NullVisitor
 
     override void visit(RawNode node)
     {
-        print("Raw block: '%s'".fmt(node.raw));
+        import std.array : replace;
+        print("Raw block: \"%s\"".fmt(node.raw.replace("\n", "\\n").replace(" ", ".")));
     }
 
 
@@ -114,6 +115,34 @@ class Printer : NullVisitor
         }
         else
             print("Else: NONE");
+        _tab--;
+    }
+
+    override void visit(ForNode node)
+    {
+        print("For: %s, %s".fmt(node.key, node.value));
+        _tab++;
+
+        print("Iterable:");
+        _tab++;
+        node.iterable.accept(this);
+        _tab--;
+
+        print("Block:");
+        _tab++;
+        node.block.accept(this);
+        _tab--;
+
+        if (node.other)
+        {
+            print("Else:");
+            _tab++;
+            node.other.accept(this);
+            _tab--;
+        }
+        else
+            print("Else: NONE");
+
         _tab--;
     }
 

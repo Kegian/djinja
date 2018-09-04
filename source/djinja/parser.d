@@ -104,6 +104,9 @@ private:
             case If:
                 return parseIf();
 
+            case For:
+                return parseFor();
+
             default:
                 assert(0, "Not implemented kw %s".fmt(front.value));
         }
@@ -112,10 +115,55 @@ private:
     }
 
 
+    Node parseFor()
+    {
+        string key, value;
+
+        pop(Keyword.For);
+        value = pop(Type.Ident).value;
+
+        if (front.type == Type.Comma)
+        {
+            pop(Type.Comma);
+            key = value;
+            value = pop(Type.Ident).value;
+        }
+
+        pop(Operator.In);
+        
+        //TODO ITERABLE
+        auto iterable = parseIdent();
+
+        pop(Type.StmtEnd);
+
+        auto block = parseStatementBlock();
+
+        pop(Type.StmtBegin);
+
+        switch (front.value) with (Keyword)
+        {
+            case EndFor:
+                pop(Keyword.EndFor);
+                pop(Type.StmtEnd);
+                return new ForNode(key, value, iterable, block, null);
+            case Else:
+                pop(Keyword.Else);
+                pop(Type.StmtEnd);
+                auto other = parseStatementBlock();
+                pop(Type.StmtBegin);
+                pop(Keyword.EndFor);
+                pop(Type.StmtEnd);
+                return new ForNode(key, value, iterable, block, other);
+            default:
+                throw new JinjaParserException("Unexpected token %s".fmt(front.value));
+        }
+    }
+
+
     Node parseIf()
     {
-        // If or ElIf
-        pop(/*Keyword.If*/);
+        //TODO: If or ElIf
+        pop();
         auto cond = parseOrExpr();
         pop(Type.StmtEnd);
 

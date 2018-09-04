@@ -16,6 +16,7 @@ alias NodeTypes = AliasSeq!(
         NumNode,
         IdentNode,
         IfNode,
+        ForNode,
     );
 
 
@@ -170,6 +171,27 @@ class IfNode : Node
     {
         this.cond = cond;
         this.then = then;
+        this.other = other;
+    }
+
+    mixin AcceptVisitor;
+}
+
+
+class ForNode : Node
+{
+    string key, value;
+    Node iterable;
+    Node block;
+    Node other;
+
+
+    this(string key, string value, Node iterable, Node block, Node other)
+    {
+        this.key = key;
+        this.value = value;
+        this.iterable = iterable;
+        this.block = block;
         this.other = other;
     }
 

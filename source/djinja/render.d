@@ -87,8 +87,10 @@ class Render(T) : IVisitor
             long ident;
             Cond cond;
             long ab;
+            string[] list;
         }
-        auto data = Foo(1,Cond(2, false),3);        
+        auto data = Foo(1,Cond(2, true),3, ["a1", "b2", "c3"]);        
+        wl("\n","Data:\n",data.serializeToUniNode,"\n");
         _context = new Context(data.serializeToUniNode);
     }
 
@@ -105,8 +107,10 @@ class Render(T) : IVisitor
 
     override void visit(StmtBlockNode node)
     {
+        pushNewContext();
         foreach(ch; node.children)
             ch.accept(this);
+        popContext();
     }
 
 
@@ -123,7 +127,6 @@ class Render(T) : IVisitor
         n.toStringType;
         _result ~= n.get!string;
     }
-
 
     override void visit(BinOpNode node)
     {
@@ -205,6 +208,49 @@ class Render(T) : IVisitor
         }
     }
 
+    override void visit(ForNode node)
+    {
+        node.iterable.accept(this);
+
+        UniNode iterable = pop();
+
+        pushNewContext();
+
+        bool iterated = false;
+
+        if (node.key.length)
+        {
+            iterable.checkNodeType(UniNode.Kind.object);
+            foreach(idx, ref obj; iterable)
+            {
+                () @trusted {
+                    _context.data[node.key] = UniNode(idx);
+                    _context.data[node.value] = obj;
+                    // TODO UPDATE LOOP VARS
+                    node.block.accept(this);
+                    iterated = true;
+                } ();
+            }
+        }
+        else
+        {
+            iterable.checkNodeType(UniNode.Kind.array);
+            foreach(ref it; iterable)
+            {
+                () @trusted {
+                    _context.data[node.value] = it;
+                    // TODO UPDATE LOOP VARS
+                    node.block.accept(this);
+                    iterated = true;
+                } ();
+            }
+        }
+
+        popContext();
+
+        if (!iterated)
+            node.other.accept(this);
+    }
 
     void print(string str)
     {
@@ -384,9 +430,17 @@ UniNode binary(string op)(UniNode lhs, UniNode rhs)
                 throw new JinjaRenderException("Not comparable type %s".fmt(lhs.kind));
         }
     }
-    else static if (op.among(Operator.Or, Operator.And))
+    else static if (op == Operator.Or)
     {
-        assert(0);
+        lhs.toBoolType;
+        rhs.toBoolType;
+        return UniNode(lhs.get!bool || rhs.get!bool);
+    }
+    else static if (op == Operator.And)
+    {
+        lhs.toBoolType;
+        rhs.toBoolType;
+        return UniNode(lhs.get!bool && rhs.get!bool);
     }
     else static assert(0);
 }
