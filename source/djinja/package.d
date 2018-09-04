@@ -19,4 +19,5 @@ public
     import djinja.exception;
     import djinja.lexer;
     import djinja.parser;
+    import djinja.render;
 }

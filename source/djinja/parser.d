@@ -8,29 +8,7 @@ private
     import djinja.ast;
     import djinja.lexer;
     import djinja.exception;
-
-    import uninode;
 }
-
-
-class Context
-{
-    Context prev;
-    UniNode data;
-
-    this ()
-    {
-        prev = null;
-        data = UniNode.emptyObject();
-    }
-
-    this (UniNode data)
-    {
-        prev = null;
-        this.data = data;
-    }
-}
-
 
 
 struct Parser(Lexer)
