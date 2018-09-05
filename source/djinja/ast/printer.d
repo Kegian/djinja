@@ -106,6 +106,21 @@ class Printer : NullVisitor
         _tab--;
     }
 
+    override void visit(DictNode node)
+    {
+        print("Dict:");
+        _tab++;
+        foreach (key, value; node.dict)
+        {
+            print("Key: %s".fmt(key));
+            print("Value:");
+            _tab++;
+            value.accept(this);
+            _tab--;
+        }
+        _tab--;
+    }
+
     override void visit(IfNode node)
     {
         print("If:");

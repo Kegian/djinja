@@ -131,8 +131,15 @@ private:
 
         pop(Operator.In);
         
-        //TODO ITERABLE
-        auto iterable = parseIdent();
+        Node iterable;
+
+        switch (front.type) with (Type)
+        {
+            case LParen:  iterable = parseTuple(); break;
+            case LSParen: iterable = parseList(); break;
+            case LBrace:  iterable = parseDict; break;
+            default:      iterable = parseIdent();
+        }
 
         pop(Type.StmtEnd);
 
@@ -313,6 +320,7 @@ private:
     /**
       * Parse factor:
       * factor = (ident|LPAREN HighLevelExpr RPAREN|literal)
+      * TODO: handle tuple
       */
     Node parseFactor()
     {
@@ -323,9 +331,13 @@ private:
 
             case LParen:
                 pop(LParen);
-                auto expr = parseHighLevelExpression();
+                bool isSeq;
+                auto exprList = parseSequence(RParen, isSeq);
                 pop(RParen);
-                return expr;
+                if (isSeq)
+                    return new ListNode(exprList);
+                else
+                    return exprList[0];
 
             default:
                 return parseLiteral();
@@ -399,36 +411,85 @@ private:
 
     Node parseTuple()
     {
-        return null;
+        //Literally array right now
+
+        pop(Type.LParen);
+        auto tuple = parseSequence(Type.RParen);
+        pop(Type.RParen);
+
+        return new ListNode(tuple);
     }
+
 
     Node parseList()
     {
-        Node[] list;
-
         pop(Type.LSParen);
+        auto list = parseSequence(Type.RSParen);
+        pop(Type.RSParen);
+
+        return new ListNode(list);
+    }
+
+
+
+    Node[] parseSequence(Type until)
+    {
+        bool isSeq;
+        return parseSequence(until, isSeq);
+    }
+
+
+    Node[] parseSequence(Type until, ref bool isSeq)
+    {
+        Node[] seq;
+
+        bool hasCommas = false;
+        while (front.type != until && front.type != Type.EOF)
+        {
+            seq ~= parseHighLevelExpression();
+
+            if (front.type != until)
+            {
+                pop(Type.Comma);
+                hasCommas = true;
+            }
+        }
+
+        isSeq = hasCommas;
+
+        return seq;
+    }
+
+
+    Node parseDict()
+    {
+        Node[string] dict;
+
+        pop(Type.LBrace);
 
         bool isFirst = true;
-        while (front.type != Type.RSParen && front.type != Type.EOF)
+        while (front.type != Type.RBrace && front.type != Type.EOF)
         {
             if (!isFirst)
                 pop(Type.Comma);
 
-            list ~= parseHighLevelExpression();
+            string key;
+            if (front.type == Type.Ident)
+                key = pop(Type.Ident).value;
+            else
+                key = pop(Type.String).value;
+
+            pop(Type.Colon);
+            dict[key] = parseHighLevelExpression();
             isFirst = false;
         }
 
         if (front.type == Type.Comma)
             pop(Type.Comma);
 
-        pop(Type.RSParen);
+        pop(Type.RBrace);
 
-        return new ListNode(list);
-    }
-
-    Node parseDict()
-    {
-        return null;
+        return new DictNode(dict);
     }
 
 

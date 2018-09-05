@@ -210,6 +210,13 @@ class Render(T) : IVisitor
 
     override void visit(DictNode node)
     {
+        UniNode[string] dict;
+        foreach (key, value; node.dict)
+        {
+            value.accept(this);
+            dict[key] = pop();
+        }
+        push(UniNode(dict));
     }
 
     override void visit(IfNode node)
@@ -394,7 +401,7 @@ void toStringType(ref UniNode n)
             case text: return n.get!string;
             case raw: return n.get!(ubyte[]).to!string;
             case array: return n.toString;
-            case object: return "[DictObj]";
+            case object: return n.toString;
             default: return "[UnknownObj]";
         }
     }

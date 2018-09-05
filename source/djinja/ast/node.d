@@ -230,8 +230,11 @@ class ListNode : Node
 
 class DictNode : Node
 {
-    this()
+    Node[string] dict;
+
+    this(Node[string] dict)
     {
+        this.dict = dict;
     }
 
     mixin AcceptVisitor;
