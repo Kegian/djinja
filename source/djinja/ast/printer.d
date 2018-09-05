@@ -91,6 +91,21 @@ class Printer : NullVisitor
         }
     }
 
+    override void visit(StringNode node)
+    {
+        print("String: %s".fmt(node.str));
+    }
+
+
+    override void visit(ListNode node)
+    {
+        print("List:");
+        _tab++;
+        foreach (l; node.list)
+            l.accept(this);
+        _tab--;
+    }
+
     override void visit(IfNode node)
     {
         print("If:");

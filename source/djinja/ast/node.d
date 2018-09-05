@@ -13,6 +13,9 @@ alias NodeTypes = AliasSeq!(
         ExprNode,
         UnaryOpNode,
         BinOpNode,
+        StringNode,
+        ListNode,
+        DictNode,
         NumNode,
         IdentNode,
         IfNode,
@@ -193,6 +196,42 @@ class ForNode : Node
         this.iterable = iterable;
         this.block = block;
         this.other = other;
+    }
+
+    mixin AcceptVisitor;
+}
+
+
+class StringNode : Node
+{
+    string str;
+
+    this(string str)
+    {
+        this.str = str;
+    }
+
+    mixin AcceptVisitor;
+}
+
+
+class ListNode : Node
+{
+    Node[] list;
+
+    this(Node[] list)
+    {
+        this.list = list;
+    }
+
+    mixin AcceptVisitor;
+}
+
+
+class DictNode : Node
+{
+    this()
+    {
     }
 
     mixin AcceptVisitor;

@@ -53,7 +53,7 @@ private:
     Node parseExpression()
     {
         pop(Type.ExprBegin);
-        auto expr = parseInlineExpr();
+        auto expr = parseHighLevelExpression();
         pop(Type.ExprEnd);
         return new ExprNode(expr);
     }
@@ -164,7 +164,7 @@ private:
     {
         //TODO: If or ElIf
         pop();
-        auto cond = parseOrExpr();
+        auto cond = parseHighLevelExpression();
         pop(Type.StmtEnd);
 
         auto then = parseStatementBlock();
@@ -195,9 +195,14 @@ private:
         }
     }
 
+    Node parseHighLevelExpression()
+    {
+        return parseOrExpr();
+    }
+
     /**
       * Parse Or Expression
-      * or = and (OR or)
+      * or = and (OR or)?
       */
     Node parseOrExpr()
     {
@@ -215,7 +220,7 @@ private:
 
     /**
       * Parse And Expression:
-      * and = cmp (AND and)
+      * and = cmp (AND and)?
       */
     Node parseAndExpr()
     {
@@ -233,24 +238,37 @@ private:
 
     /**
       * Parse compare expression:
-      * cmp = expr (CMPOP expr)?
+      * cmp = concatexpr (CMPOP concatexpr)?
       */
     Node parseCmpExpr()
     {
-        auto lhs = parseInlineExpr();
+        auto lhs = parseConcatExpr();
 
         if (front.type == Type.Operator && front.value.toOperator.isCmpOperator)
-            return new BinOpNode(pop.value, lhs, parseInlineExpr);
+            return new BinOpNode(pop.value, lhs, parseConcatExpr);
 
         return lhs;
     }
 
-
     /**
       * Parse expression:
-      * expr = term((PLUS|MINUS)expr)?
+      * concatexpr = mathexpr((CONCAT)concatexpr)?
       */
-    Node parseInlineExpr()
+    Node parseConcatExpr()
+    {
+        auto lhsTerm = parseMathExpr();
+
+        if (front.type != Type.Operator || front.value != Operator.Concat)
+            return lhsTerm;
+
+        return new BinOpNode(pop(Operator.Concat).value, lhsTerm, parseConcatExpr());
+    }
+
+    /**
+      * Parse math expression:
+      * mathexpr = term((PLUS|MINUS)mathexpr)?
+      */
+    Node parseMathExpr()
     {
         auto lhsTerm = parseTerm();
         if (front.type != Type.Operator)
@@ -261,7 +279,7 @@ private:
             case Plus:
             case Minus:
                 auto op = pop.value;
-                return new BinOpNode(op, lhsTerm, parseInlineExpr());
+                return new BinOpNode(op, lhsTerm, parseMathExpr());
             default:
                 return lhsTerm;
         }
@@ -294,35 +312,29 @@ private:
 
     /**
       * Parse factor:
-      * factor = (INTEGER|FLOAT|ident|LPAREN OrExpr RPAREN)
+      * factor = (ident|LPAREN HighLevelExpr RPAREN|literal)
       */
     Node parseFactor()
     {
         switch (front.type) with (Type)
         {
-            case Integer:
-                return new NumNode(pop.value.to!long);
-
-            case Float:
-                return new NumNode(pop.value.to!double);
-
             case Ident:
                 return parseIdent();
 
             case LParen:
                 pop(LParen);
-                auto expr = parseOrExpr();
+                auto expr = parseHighLevelExpression();
                 pop(RParen);
                 return expr;
 
             default:
-                throw new JinjaParserException("Unexpected token while parsing expression: %s".fmt(front.value));
+                return parseLiteral();
         }
     }
 
     /**
       * Parse ident:
-      * ident = IDENT(DOT IDENT| LSPAREN STR LRPAREN IDENT)?
+      * ident = IDENT(DOT IDENT| LSPAREN STR LRPAREN)*
       */
     Node parseIdent()
     {
@@ -364,6 +376,59 @@ private:
                     return new IdentNode(name, subNames);
             }
         }
+    }
+
+    /**
+      * literal = string|number|list|tuple|dict
+      */
+    Node parseLiteral()
+    {
+        switch (front.type) with (Type)
+        {
+            case Integer: return new NumNode(pop.value.to!long);
+            case Float:   return new NumNode(pop.value.to!double);
+            case String:  return new StringNode(pop.value);
+            case LParen:  return parseTuple();
+            case LSParen: return parseList();
+            case LBrace:  return parseDict();
+            default:
+                throw new JinjaParserException("Unexpected token while parsing expression: %s".fmt(front.value));
+        }
+    }
+
+
+    Node parseTuple()
+    {
+        return null;
+    }
+
+    Node parseList()
+    {
+        Node[] list;
+
+        pop(Type.LSParen);
+
+        bool isFirst = true;
+        while (front.type != Type.RSParen && front.type != Type.EOF)
+        {
+            if (!isFirst)
+                pop(Type.Comma);
+
+            list ~= parseHighLevelExpression();
+            isFirst = false;
+        }
+
+        if (front.type == Type.Comma)
+            pop(Type.Comma);
+
+        pop(Type.RSParen);
+
+        return new ListNode(list);
+    }
+
+    Node parseDict()
+    {
+        return null;
     }
 
 

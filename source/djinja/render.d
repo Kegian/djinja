@@ -141,6 +141,7 @@ class Render(T) : IVisitor
         {
             switch (node.op) with (Operator)
             {
+                case Concat:    return binary!Concat(lhs, rhs);
                 case Plus:      return binary!Plus(lhs, rhs);
                 case Minus:     return binary!Minus(lhs,rhs);
                 case DivInt:    return binary!DivInt(lhs,rhs);
@@ -189,6 +190,26 @@ class Render(T) : IVisitor
                 throw new JinjaParserException("Unknown attribute %s".fmt(attr));
 
         push(curr);
+    }
+
+    override void visit(StringNode node)
+    {
+        push(UniNode(node.str));
+    }
+
+    override void visit(ListNode node)
+    {
+        UniNode[] list = [];
+        foreach (l; node.list)
+        {
+            l.accept(this);
+            list ~= pop();
+        }
+        push(UniNode(list));
+    }
+
+    override void visit(DictNode node)
+    {
     }
 
     override void visit(IfNode node)
@@ -372,7 +393,7 @@ void toStringType(ref UniNode n)
             case floating: return n.get!double.to!string;
             case text: return n.get!string;
             case raw: return n.get!(ubyte[]).to!string;
-            case array: return "[ArrayObj]";
+            case array: return n.toString;
             case object: return "[DictObj]";
             default: return "[UnknownObj]";
         }
@@ -441,6 +462,12 @@ UniNode binary(string op)(UniNode lhs, UniNode rhs)
         lhs.toBoolType;
         rhs.toBoolType;
         return UniNode(lhs.get!bool && rhs.get!bool);
+    }
+    else static if (op == Operator.Concat)
+    {
+        lhs.toStringType;
+        rhs.toStringType;
+        return UniNode(lhs.get!string ~ rhs.get!string);
     }
     else static assert(0);
 }
