@@ -35,8 +35,47 @@ struct Parser(Lexer)
         }
     }
 
+    void preprocess()
+    {
+        import std.uni : isWhite;
+
+        // Cutting newline and whitespaces before/after statements
+        for(int i = 1; i < tokens_.length - 1; i++)
+        {
+            if (tokens_[i].type == Type.StmtBegin
+                && tokens_[i-1].type == Type.Raw)
+            {
+                auto str = tokens_[i-1].value;
+                auto idx = str.length;
+                for (long j = cast(long)str.length - 1; j >= 0; j--)
+                {
+                    if (str[j] == '\n')
+                        break;
+                    if (isWhite(str[j]))
+                        idx = j;
+                }
+                tokens_[i-1].value = idx > 0 ? str[0 .. idx] : "";
+            }
+            else if (tokens_[i].type == Type.StmtEnd
+                && tokens_[i+1].type == Type.Raw)
+            {
+                auto str = tokens_[i+1].value;
+                auto idx = 0;
+                for (auto j = 0; j < str.length; j++)
+                {
+                    if (isWhite(str[j]))
+                        idx = j + 1;
+                    if (str[j] == '\n')
+                        break;
+                }
+                tokens_[i+1].value = idx < str.length ? str[idx .. $] : "";
+            }
+        }
+    }
+
     void parseTree()
     {
+        preprocess();
         _root = parseStatementBlock();
         if (front.type != Type.EOF)
             throw new JinjaParserException("Expected EOF found %s".fmt(front.value));
@@ -319,8 +358,7 @@ private:
 
     /**
       * Parse factor:
-      * factor = (ident|LPAREN HighLevelExpr RPAREN|literal)
-      * TODO: handle tuple
+      * factor = (ident|tuple|LPAREN HighLevelExpr RPAREN|literal)
       */
     Node parseFactor()
     {
@@ -334,10 +372,7 @@ private:
                 bool isSeq;
                 auto exprList = parseSequence(RParen, isSeq);
                 pop(RParen);
-                if (isSeq)
-                    return new ListNode(exprList);
-                else
-                    return exprList[0];
+                return isSeq ? new ListNode(exprList) : exprList[0];
 
             default:
                 return parseLiteral();
