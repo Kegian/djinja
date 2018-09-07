@@ -83,10 +83,27 @@ class Printer : NullVisitor
     override void visit(IdentNode node)
     {
         print("Ident: %s".fmt(node.name));
-        if (node.subNames.length)
+        if (node.subIdents.length)
+        {
+            print("Sub idents:");
+            _tab++;
+            foreach (id; node.subIdents)
+                id.accept(this);
+            _tab--;
+        }
+    }
+
+    override void visit(AssignableNode node)
+    {
+        print("Assignable: %s".fmt(node.name));
+        if (node.subIdents.length)
         {
             _tab++;
-            print("Sub names: %s".fmt(node.subNames));
+            print("Sub idents:");
+            _tab++;
+            foreach (id; node.subIdents)
+                id.accept(this);
+            _tab--;
             _tab--;
         }
     }
@@ -172,6 +189,26 @@ class Printer : NullVisitor
         }
         else
             print("Else: NONE");
+
+        _tab--;
+    }
+
+
+    override void visit(SetNode node)
+    {
+        print("Set:");
+        _tab++;
+
+        print("Assigns:");
+        _tab++;
+        foreach (assign; node.assigns)
+            assign.accept(this);
+        _tab--;
+
+        print("Expression:");
+        _tab++;
+        node.expr.accept(this);
+        _tab--;
 
         _tab--;
     }

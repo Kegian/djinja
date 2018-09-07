@@ -40,6 +40,15 @@ class Context
         prev = null;
         this.data = data;
     }
+
+    bool has(string name)
+    {
+        if (name in data)
+            return true;
+        if (prev is null)
+            return false;
+        return prev.has(name);
+    }
     
     UniNode get(string name)
     {
@@ -48,6 +57,15 @@ class Context
         if (prev is null)
             throw new JinjaRenderException("Non declared var `%s`".fmt(name));
         return prev.get(name);
+    }
+
+    UniNode* getPtr(string name)
+    {
+        if (name in data)
+            return &(data[name]);
+        if (prev is null)
+            throw new JinjaRenderException("Non declared var `%s`".fmt(name));
+        return prev.getPtr(name);
     }
     
     T get(T)(string name)
@@ -165,7 +183,7 @@ class Render(T) : IVisitor
 
     override void visit(UnaryOpNode node)
     {
-        print("UnaryOp: %s".fmt(node.op));
+        // print("UnaryOp: %s".fmt(node.op));
         _tab++;
         node.expr.accept(this);
         _tab--;
@@ -183,13 +201,124 @@ class Render(T) : IVisitor
     {
         auto curr = _context.get(node.name);
 
-        foreach (attr; node.subNames)
-            if (attr in curr)
-                curr = curr[attr];
-            else
-                throw new JinjaParserException("Unknown attribute %s".fmt(attr));
+        foreach (sub; node.subIdents)
+        {
+            sub.accept(this);
+            auto key = pop();
+
+            switch (key.kind) with (UniNode.Kind)
+            {
+                // Index of list/tuple
+                case integer:
+                case uinteger:
+                    curr.checkNodeType(array);
+                    if (key.get!long < curr.length)
+                        curr = curr[key.get!long];
+                    else
+                        throw new JinjaParserException("Range violation  on %s...[%d]".fmt(node.name, key.get!long));
+                    break;
+
+                // Key of dict
+                case text:
+                    if (key.get!string in curr)
+                        curr = curr[key.get!string];
+                    else
+                        throw new JinjaParserException("Unknown attribute %s".fmt(key.get!string));
+                    break;
+
+                // Call of function
+                // TODO
+                case object:
+                    break;
+                case nil:
+                    break;
+                default:
+                    throw new JinjaRenderException("Unknown attribute %s for %s".fmt(key.toString, node.name));
+            }
+
+        }
 
         push(curr);
+    }
+
+    override void visit(AssignableNode node)
+    {
+        auto expr = pop();
+
+        if (!_context.has(node.name))
+        {
+            if (node.subIdents.length)
+                throw new JinjaRenderException("Unknow variable %s".fmt(node.name));
+            _context.data[node.name] = expr;
+            return;
+        }
+
+        UniNode* curr = _context.getPtr(node.name);
+
+        if (!node.subIdents.length)
+        {
+            (*curr) = expr;
+            return;
+        }
+
+        for(int i = 0; i < cast(long)(node.subIdents.length) - 1; i++)
+        {
+            import std.stdio: wl = writeln;
+            wl(node.subIdents.length-1, " ", i);
+            node.subIdents[i].accept(this);
+            auto key = pop();
+
+            switch (key.kind) with (UniNode.Kind)
+            {
+                // Index of list/tuple
+                case integer:
+                case uinteger:
+                    checkNodeType(*curr, array);
+                    if (key.get!long < curr.length)
+                        curr = &((*curr)[key.get!long]);
+                    else
+                        throw new JinjaParserException("Range violation  on %s...[%d]".fmt(node.name, key.get!long));
+                    break;
+
+                // Key of dict
+                case text:
+                    if (key.get!string in *curr)
+                        curr = &((*curr)[key.get!string]);
+                    else
+                        throw new JinjaParserException("Unknown attribute %s".fmt(key.get!string));
+                    break;
+
+                default:
+                    throw new JinjaRenderException("Unknown attribute %s for %s".fmt(key.toString, node.name));
+            }
+        }
+
+        if (node.subIdents.length)
+        {
+            node.subIdents[$-1].accept(this);
+            auto key = pop();
+
+            switch (key.kind) with (UniNode.Kind)
+            {
+                // Index of list/tuple
+                case integer:
+                case uinteger:
+                    checkNodeType(*curr, array);
+                    if (key.get!long < curr.length)
+                        (*curr).opIndex(key.get!long) = expr; // ¯\_(ツ)_/¯
+                    else
+                        throw new JinjaParserException("Range violation  on %s...[%d]".fmt(node.name, key.get!long));
+                    break;
+
+                // Key of dict
+                case text:
+                    (*curr)[key.get!string] = expr;
+                    break;
+
+                default:
+                    throw new JinjaRenderException("Unknown attribute %s for %s".fmt(key.toString, node.name));
+            }
+        }
     }
 
     override void visit(StringNode node)
@@ -280,11 +409,27 @@ class Render(T) : IVisitor
             node.other.accept(this);
     }
 
-    void print(string str)
+
+    override void visit(SetNode node)
     {
-        foreach(i; 0 .. _tab)
-            w(" -- ");
-        wl(str);
+        node.expr.accept(this);
+
+        if (node.assigns.length == 1)
+            node.assigns[0].accept(this);            
+        else
+        {
+            auto expr = pop();
+            expr.checkNodeType(UniNode.Kind.array);
+            
+            if (expr.length < node.assigns.length)
+                throw new JinjaRenderException("Iterable length less then number of assigns");
+
+            foreach(idx, assign; node.assigns)
+            {
+                push(expr[idx]);
+                assign.accept(this);
+            }
+        }
     }
 
 
@@ -412,7 +557,7 @@ void toStringType(ref UniNode n)
 void checkNodeType(ref UniNode n, UniNode.Kind kind)
 {
     if (n.kind != kind)
-        throw new JinjaRenderException("Unexpected type of var");
+        throw new JinjaRenderException("Unexpected expression type %s, expcted %s".fmt(n.kind, kind));
 }
 
 

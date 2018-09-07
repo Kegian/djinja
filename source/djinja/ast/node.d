@@ -20,6 +20,8 @@ alias NodeTypes = AliasSeq!(
         IdentNode,
         IfNode,
         ForNode,
+        SetNode,
+        AssignableNode,
     );
 
 
@@ -154,12 +156,29 @@ class NumNode : Node
 class IdentNode : Node
 {
     string name;
-    string[] subNames;
+    Node[] subIdents;
 
-    this(string name, string[] subNames)
+
+    this(string name, Node[] subIdents)
     {
         this.name = name;
-        this.subNames = subNames;
+        this.subIdents = subIdents;
+    }
+
+    mixin AcceptVisitor;
+}
+
+
+class AssignableNode : Node
+{
+    string name;
+    Node[] subIdents;
+
+
+    this(string name, Node[] subIdents)
+    {
+        this.name = name;
+        this.subIdents = subIdents;
     }
 
     mixin AcceptVisitor;
@@ -235,6 +254,21 @@ class DictNode : Node
     this(Node[string] dict)
     {
         this.dict = dict;
+    }
+
+    mixin AcceptVisitor;
+}
+
+
+class SetNode : Node
+{
+    Node[] assigns;
+    Node expr;
+
+    this(Node[] assigns, Node expr)
+    {
+        this.assigns = assigns;
+        this.expr = expr;
     }
 
     mixin AcceptVisitor;

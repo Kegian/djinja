@@ -140,12 +140,9 @@ private:
 
         switch(front.value) with (Keyword)
         {
-            case If:
-                return parseIf();
-
-            case For:
-                return parseFor();
-
+            case If:  return parseIf();
+            case For: return parseFor();
+            case Set: return parseSet();
             default:
                 assert(0, "Not implemented kw %s".fmt(front.value));
         }
@@ -215,8 +212,6 @@ private:
 
         auto then = parseStatementBlock();
 
-        //TODO check else && elifs
-
         pop(Type.StmtBegin);
 
         switch (front.value) with (Keyword)
@@ -240,6 +235,48 @@ private:
                 throw new JinjaParserException("Enexppected token %s".fmt(front.value));
         }
     }
+
+
+    Node parseSet()
+    {
+        pop(Keyword.Set);
+
+        auto assigns = parseSequenceOf!parseAssignable(Type.Operator);
+
+        pop(Operator.Assign);
+
+        auto expr = parseHighLevelExpression();
+
+        pop(Type.StmtEnd);
+
+        return new SetNode(assigns, expr);
+    }
+
+
+    Node parseAssignable()
+    {
+        string name = pop(Type.Ident).value;
+        Node[] subIdents = [];
+
+        while (true)
+        {
+            switch (front.type) with (Type)
+            {
+                case Dot:
+                    pop(Dot);
+                    subIdents ~= new StringNode(pop(Ident).value);
+                    break;
+                case LSParen:
+                    pop(LSParen);
+                    subIdents ~= parseHighLevelExpression();
+                    pop(RSParen);
+                    break;
+                default:
+                    return new AssignableNode(name, subIdents);
+            }
+        }
+    }
+
 
     Node parseHighLevelExpression()
     {
@@ -369,10 +406,10 @@ private:
 
             case LParen:
                 pop(LParen);
-                bool isSeq;
-                auto exprList = parseSequence(RParen, isSeq);
+                bool hasCommas;
+                auto exprList = parseSequenceOf!parseHighLevelExpression(RParen, hasCommas);
                 pop(RParen);
-                return isSeq ? new ListNode(exprList) : exprList[0];
+                return hasCommas ? new ListNode(exprList) : exprList[0];
 
             default:
                 return parseLiteral();
@@ -385,26 +422,8 @@ private:
       */
     Node parseIdent()
     {
-        string parseName()
-        {
-            string name;
-            switch (front.type) with (Type)
-            {
-                case Ident:
-                    name = pop(Ident).value;
-                    break;
-                case LSParen:
-                    pop(LSParen);
-                    name = pop(String).value;
-                    pop(RSParen);
-                    break;
-                default:
-                    throw new JinjaParserException("Unexpected token %s".fmt(front.type));
-            }
-            return name;
-        }
-        string name = parseName();
-        string[] subNames = [];
+        string name = pop(Type.Ident).value;
+        Node[] subIdents = [];
 
         while (true)
         {
@@ -412,15 +431,20 @@ private:
             {
                 case Dot:
                     pop(Dot);
-                    subNames ~= pop(Ident).value;
+                    subIdents ~= new StringNode(pop(Ident).value);
                     break;
                 case LSParen:
                     pop(LSParen);
-                    subNames ~= pop(String).value;
+                    subIdents ~= parseHighLevelExpression();
                     pop(RSParen);
                     break;
+                case LParen:
+                    pop(LParen);
+                    //TODO parse call function
+                    pop(RParen);
+                    break;
                 default:
-                    return new IdentNode(name, subNames);
+                    return new IdentNode(name, subIdents);
             }
         }
     }
@@ -449,7 +473,7 @@ private:
         //Literally array right now
 
         pop(Type.LParen);
-        auto tuple = parseSequence(Type.RParen);
+        auto tuple = parseSequenceOf!parseHighLevelExpression(Type.RParen);
         pop(Type.RParen);
 
         return new ListNode(tuple);
@@ -459,38 +483,35 @@ private:
     Node parseList()
     {
         pop(Type.LSParen);
-        auto list = parseSequence(Type.RSParen);
+        auto list = parseSequenceOf!parseHighLevelExpression(Type.RSParen);
         pop(Type.RSParen);
 
         return new ListNode(list);
     }
 
 
-
-    Node[] parseSequence(Type until)
+    Node[] parseSequenceOf(alias parser)(Type stopSymbol)
     {
-        bool isSeq;
-        return parseSequence(until, isSeq);
+        bool hasCommas;
+        return parseSequenceOf!parser(stopSymbol, hasCommas);
     }
 
 
-    Node[] parseSequence(Type until, ref bool isSeq)
+    Node[] parseSequenceOf(alias parser)(Type stopSymbol, ref bool hasCommas)
     {
         Node[] seq;
 
-        bool hasCommas = false;
-        while (front.type != until && front.type != Type.EOF)
+        hasCommas = false;
+        while (front.type != stopSymbol && front.type != Type.EOF)
         {
-            seq ~= parseHighLevelExpression();
+            seq ~= parser();
 
-            if (front.type != until)
+            if (front.type != stopSymbol)
             {
                 pop(Type.Comma);
                 hasCommas = true;
             }
         }
-
-        isSeq = hasCommas;
 
         return seq;
     }
@@ -589,17 +610,17 @@ private:
 
 bool isBeginingKeyword(Keyword kw)
 {
-import std.algorithm : among;
+    import std.algorithm : among;
 
-return cast(bool)kw.among(
-            Keyword.If,
-            Keyword.Set,
-            Keyword.For,
-            Keyword.Block,
-            Keyword.Extends,
-            Keyword.Macro,
-            Keyword.Call,
-            Keyword.Include,
-            Keyword.Import
-    );
+    return cast(bool)kw.among(
+                Keyword.If,
+                Keyword.Set,
+                Keyword.For,
+                Keyword.Block,
+                Keyword.Extends,
+                Keyword.Macro,
+                Keyword.Call,
+                Keyword.Include,
+                Keyword.Import
+        );
 }
