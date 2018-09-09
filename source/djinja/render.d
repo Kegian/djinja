@@ -101,9 +101,6 @@ class Context
 
 class Render(T) : IVisitor
 {
-    import std.stdio: wl = writeln, w = write;
-    import std.format: fmt = format;
-
     private
     {
         T _parser;
@@ -481,8 +478,6 @@ private:
     void push(UniNode un)
     {
         _stack ~= un;
-        import std.stdio: wl = writeln;
-        // wl("Stack: ", _stack);
     }
 
 
@@ -564,6 +559,8 @@ void toBoolType(ref UniNode n)
 
 void toStringType(ref UniNode n)
 {
+    import std.algorithm : map;
+    import std.string : join;
     string doSwitch()
     {
         switch (n.kind) with (UniNode.Kind)
@@ -574,12 +571,19 @@ void toStringType(ref UniNode n)
             case floating: return n.get!double.to!string;
             case text: return n.get!string;
             case raw: return n.get!(ubyte[]).to!string;
-            case array: return n.toString;
+            case array: return "["~n.get!(UniNode[]).map!(a => a.getString).join(",").to!string~"]"; 
             case object: return n.toString;
             default: return "[UnknownObj: %s]".fmt(n.toString);
         }
     }
     n = UniNode(doSwitch());
+}
+
+
+string getString(UniNode n)
+{
+    n.toStringType;
+    return n.get!string;
 }
 
 
