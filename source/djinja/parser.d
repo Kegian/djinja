@@ -245,7 +245,8 @@ private:
 
         pop(Operator.Assign);
 
-        auto expr = parseHighLevelExpression();
+        auto exprs = parseSequenceOf!parseHighLevelExpression(Type.StmtEnd);
+        Node expr = exprs.length == 1 ? exprs[0] : new ListNode(exprs);
 
         pop(Type.StmtEnd);
 
@@ -418,12 +419,17 @@ private:
 
     /**
       * Parse ident:
-      * ident = IDENT(DOT IDENT| LSPAREN STR LRPAREN)*
+      * ident = IDENT (LPAREN ARGS RPAREN)? (DOT IDENT (LP ARGS RP)?| LSPAREN STR LRPAREN)*
       */
     Node parseIdent()
     {
-        string name = pop(Type.Ident).value;
+        string name = "";
         Node[] subIdents = [];
+
+        if (next.type == Type.LParen)
+            subIdents ~= parseCallExpr();
+        else
+            name = pop(Type.Ident).value;
 
         while (true)
         {
@@ -431,22 +437,61 @@ private:
             {
                 case Dot:
                     pop(Dot);
-                    subIdents ~= new StringNode(pop(Ident).value);
+                    if (next.type == Type.LParen)
+                        subIdents ~= parseCallExpr();
+                    else
+                        subIdents ~= new StringNode(pop(Ident).value);
                     break;
                 case LSParen:
                     pop(LSParen);
                     subIdents ~= parseHighLevelExpression();
                     pop(RSParen);
                     break;
-                case LParen:
-                    pop(LParen);
-                    //TODO parse call function
-                    pop(RParen);
-                    break;
                 default:
                     return new IdentNode(name, subIdents);
             }
         }
+    }
+
+
+    Node parseCallExpr()
+    {
+        string name = pop(Type.Ident).value;
+        Node[] varargs;
+        Node[string] kwargs;
+
+        bool parsingKwargs = false;
+        void parse()
+        {
+            if (parsingKwargs || front.type == Type.Ident && next.value == Operator.Assign)
+            {
+                parsingKwargs = true;
+                auto name = pop(Type.Ident).value;
+                pop(Operator.Assign);
+                kwargs[name] = parseHighLevelExpression();
+            }
+            else
+                varargs ~= parseHighLevelExpression();
+        }
+
+        pop(Type.LParen);
+
+        while (front.type != Type.EOF && front.type != Type.RParen)
+        {
+            parse();
+
+            if (front.type != Type.RParen)
+                pop(Type.Comma);
+        }
+
+        pop(Type.RParen);
+
+        Node[string] callDict;
+        callDict["name"] = new StringNode(name);
+        callDict["varargs"] = new ListNode(varargs);
+        callDict["kwargs"] = new DictNode(kwargs);
+
+        return new DictNode(callDict);
     }
 
     /**

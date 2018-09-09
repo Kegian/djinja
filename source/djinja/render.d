@@ -9,6 +9,7 @@ private
 
     import djinja.ast.node;
     import djinja.ast.visitor;
+    import djinja.algo;
     import djinja.lexer;
     import djinja.parser;
     import djinja.exception;
@@ -22,6 +23,8 @@ class Context
 {
     Context prev;
     UniNode data;
+
+    Function[string] functions;
 
     this ()
     {
@@ -72,6 +75,26 @@ class Context
     {
         return this.get(name).get!T;
     }
+    
+
+    bool hasFunc(string name)
+    {
+        if (name in functions)
+            return true;
+        if (prev is null)
+            return false;
+        return prev.hasFunc(name);
+    }
+
+    
+    Function getFunc(string name)
+    {
+        if (name in functions)
+            return functions[name];
+        if (prev is null)
+            throw new JinjaRenderException("Non declared function `%s`".fmt(name));
+        return prev.getFunc(name);
+    }
 }
 
 
@@ -109,7 +132,9 @@ class Render(T) : IVisitor
         }
         auto data = Foo(1,Cond(2, true),3, ["a1", "b2", "c3"]);        
         wl("\n","Data:\n",data.serializeToUniNode,"\n");
+
         _context = new Context(data.serializeToUniNode);
+        _context.functions = cast(Function[string])functionList;
     }
 
 
@@ -131,12 +156,10 @@ class Render(T) : IVisitor
         popContext();
     }
 
-
     override void visit(RawNode node)
     {
         _result ~= node.raw;
     }
-
 
     override void visit(ExprNode node)
     {
@@ -199,7 +222,11 @@ class Render(T) : IVisitor
 
     override void visit(IdentNode node)
     {
-        auto curr = _context.get(node.name);
+        UniNode curr;
+        if (node.name.length)
+            curr = _context.get(node.name);
+        else
+            curr = UniNode(null);
 
         foreach (sub; node.subIdents)
         {
@@ -220,8 +247,19 @@ class Render(T) : IVisitor
 
                 // Key of dict
                 case text:
-                    if (key.get!string in curr)
-                        curr = curr[key.get!string];
+                    auto keyStr = key.get!string;
+                    if (curr.kind == UniNode.Kind.object && keyStr in curr)
+                        curr = curr[keyStr];
+                    else if (_context.hasFunc(keyStr))
+                    {
+                        auto func = _context.getFunc(keyStr);
+                        auto args = [
+                            "name": UniNode(keyStr),
+                            "varargs": UniNode([curr]),
+                            "kwargs": UniNode.emptyObject
+                        ];
+                        curr = func(UniNode(args));
+                    }
                     else
                         throw new JinjaParserException("Unknown attribute %s".fmt(key.get!string));
                     break;
@@ -229,7 +267,13 @@ class Render(T) : IVisitor
                 // Call of function
                 // TODO
                 case object:
+                    //TODO check name/varargs/kwargs
+                    if (!curr.isNull)
+                        key["varargs"] = UniNode([curr] ~ key["varargs"].get!(UniNode[]));
+                    auto func = _context.getFunc(key["name"].get!string);
+                    curr = func(key);
                     break;
+
                 case nil:
                     break;
                 default:
@@ -405,7 +449,7 @@ class Render(T) : IVisitor
 
         popContext();
 
-        if (!iterated)
+        if (!iterated && node.other !is null)
             node.other.accept(this);
     }
 
@@ -547,7 +591,7 @@ void toStringType(ref UniNode n)
             case raw: return n.get!(ubyte[]).to!string;
             case array: return n.toString;
             case object: return n.toString;
-            default: return "[UnknownObj]";
+            default: return "[UnknownObj: %s]".fmt(n.toString);
         }
     }
     n = UniNode(doSwitch());

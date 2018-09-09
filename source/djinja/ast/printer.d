@@ -82,7 +82,7 @@ class Printer : NullVisitor
 
     override void visit(IdentNode node)
     {
-        print("Ident: %s".fmt(node.name));
+        print("Ident: '%s'".fmt(node.name));
         if (node.subIdents.length)
         {
             print("Sub idents:");
