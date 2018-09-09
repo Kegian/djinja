@@ -117,29 +117,16 @@ class Render(T) : IVisitor
         _parser = parser;
         _parser.parseTree();
 
-        //TODO just test
-        struct Cond
-        {
-            long a;
-            bool c;
-        }
-        struct Foo
-        {
-            long ident;
-            Cond cond;
-            long ab;
-            string[] list;
-        }
-        auto data = Foo(1,Cond(2, true),3, ["a1", "b2", "c3"]);        
-        wl("\n","Data:\n",data.serializeToUniNode,"\n");
-
-        _context = new Context(data.serializeToUniNode);
+        _context = new Context();
         _context.functions = cast(Function[string])functionList;
     }
 
 
-    string render()
+    string render(UniNode data)
     {
+        _context = new Context(data);
+        _context.functions = cast(Function[string])functionList;
+
         _result = "";
         if (_parser.root !is null)
             _parser.root.accept(this);
@@ -307,8 +294,6 @@ class Render(T) : IVisitor
 
         for(int i = 0; i < cast(long)(node.subIdents.length) - 1; i++)
         {
-            import std.stdio: wl = writeln;
-            wl(node.subIdents.length-1, " ", i);
             node.subIdents[i].accept(this);
             auto key = pop();
 

@@ -230,6 +230,7 @@ struct Lexer(
         if (cmntOpBegin == front(cmntOpBegin.length))
         {
             skip(cmntOpBegin.length);
+            skipComment();
             return Token(Type.CmntBegin, cmntOpBegin);
         }
 
@@ -467,6 +468,17 @@ private:
                 return raw;
             
             raw ~= pop();
+        }
+    }
+
+
+    void skipComment()
+    {
+        while(front != EOF)
+        {
+            if (cmntOpEnd == front(cmntOpEnd.length))
+                return;
+            pop();
         }
     }
 }
