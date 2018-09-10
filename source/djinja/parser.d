@@ -89,7 +89,7 @@ struct Parser(Lexer)
 private: 
 
 
-    Node parseExpression()
+    ExprNode parseExpression()
     {
         pop(Type.ExprBegin);
         auto expr = parseHighLevelExpression();
@@ -97,7 +97,7 @@ private:
         return new ExprNode(expr);
     }
 
-    Node parseStatementBlock()
+    StmtBlockNode parseStatementBlock()
     {
         auto block = new StmtBlockNode();
 
@@ -140,9 +140,10 @@ private:
 
         switch(front.value) with (Keyword)
         {
-            case If:  return parseIf();
-            case For: return parseFor();
-            case Set: return parseSet();
+            case If:    return parseIf();
+            case For:   return parseFor();
+            case Set:   return parseSet();
+            case Macro: return parseMacro();
             default:
                 assert(0, "Not implemented kw %s".fmt(front.value));
         }
@@ -151,7 +152,7 @@ private:
     }
 
 
-    Node parseFor()
+    ForNode parseFor()
     {
         string key, value;
 
@@ -203,7 +204,7 @@ private:
     }
 
 
-    Node parseIf()
+    IfNode parseIf()
     {
         //TODO: If or ElIf
         pop();
@@ -237,7 +238,7 @@ private:
     }
 
 
-    Node parseSet()
+    SetNode parseSet()
     {
         pop(Keyword.Set);
 
@@ -254,7 +255,7 @@ private:
     }
 
 
-    Node parseAssignable()
+    AssignableNode parseAssignable()
     {
         string name = pop(Type.Ident).value;
         Node[] subIdents = [];
@@ -276,6 +277,67 @@ private:
                     return new AssignableNode(name, subIdents);
             }
         }
+    }
+
+
+    MacroNode parseMacro()
+    {
+        alias Arg = MacroNode.Arg;
+
+        Arg[] args = [];
+        bool isVarargs = true;
+        void parseArgs()
+        {
+            while(front.type != Type.EOF && front.type != Type.RParen)
+            {
+                auto name = pop(Type.Ident).value;
+                Node def = null;
+
+                if (!isVarargs || front.type == Type.Operator && front.value == Operator.Assign)
+                {
+                    isVarargs = false;
+                    pop(Operator.Assign);
+                    def = parseHighLevelExpression();
+                }
+
+                args ~= Arg(name, def);
+                
+                if (front.type != Type.RParen)
+                    pop(Type.Comma);
+            }
+        }
+
+        pop(Keyword.Macro);
+
+        auto name = pop(Type.Ident).value;
+
+        if (front.type == Type.LParen)
+        {
+            pop(Type.LParen);
+            parseArgs();
+            pop(Type.RParen);
+        }
+
+        pop(Type.StmtEnd);
+
+        auto block = parseStatementBlock();
+
+        pop(Type.StmtBegin);
+        pop(Keyword.EndMacro);
+
+        bool ret = false;
+        if (front.type == Type.Keyword && front.value == Keyword.Return)
+        {
+            pop(Keyword.Return);
+            block.children ~= parseHighLevelExpression();
+            ret = true;
+        }
+        else
+            block.children ~= new StringNode("");
+
+        pop(Type.StmtEnd);
+
+        return new MacroNode(name, args, block, ret);
     }
 
 

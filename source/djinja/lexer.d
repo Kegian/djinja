@@ -58,6 +58,7 @@ enum Keyword : string
     Extends = "extends",
     Macro = "macro",
     EndMacro = "endmacro",
+    Return = "return",
     Call = "call",
     EndCall = "endcall",
     Filter = "filter",

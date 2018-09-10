@@ -214,6 +214,44 @@ class Printer : NullVisitor
     }
 
 
+    override void visit(MacroNode node)
+    {
+        print("Macro: '%s'".fmt(node.name));
+
+        _tab++;
+        if (!node.args.length)
+            print("Args: NONE");
+        else
+        {
+            print("Args:");
+            _tab++;
+            foreach(arg; node.args)
+            {
+                print("Name: %s".fmt(arg.name));
+                if (!arg.defaultExpr.isNull)
+                {
+                    _tab++;
+                    print("Default:");
+                    _tab++;
+                    arg.defaultExpr.accept(this);
+                    _tab--;
+                    _tab--;
+                }
+            }
+            _tab--;
+        }
+
+        print("Body:");
+        _tab++;
+        node.block.accept(this);
+        _tab--;
+
+        _tab--;
+
+        print("Return: %s".fmt(node.isReturn));
+    }
+
+
     void print(string str)
     {
         foreach(i; 0 .. _tab)

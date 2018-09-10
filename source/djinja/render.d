@@ -19,12 +19,47 @@ private
 }
 
 
+struct FormArg
+{
+    string name;
+    Nullable!UniNode def;
+
+    this (string name)
+    {
+        this.name = name;
+        this.def = Nullable!UniNode.init;
+    }
+
+    this (string name, UniNode def)
+    {
+        this.name = name;
+        this.def = Nullable!UniNode(def);
+    }
+}
+
+
+struct Macro
+{
+    FormArg[] args;
+    Nullable!Context context;
+    Nullable!Node block;
+
+    this(FormArg[] args, Context context, Node block)
+    {
+        this.args = args;
+        this.context = context.toNullable;
+        this.block = block.toNullable;
+    }
+}
+
+
 class Context
 {
-    Context prev;
-    UniNode data;
+    private Context prev;
 
+    UniNode data;
     Function[string] functions;
+    Macro[string] macros;
 
     this ()
     {
@@ -42,6 +77,13 @@ class Context
     {
         prev = null;
         this.data = data;
+    }
+
+    Context previos() @property
+    {
+        if (prev !is null)
+            return prev;
+        return this;
     }
 
     bool has(string name)
@@ -94,6 +136,26 @@ class Context
         if (prev is null)
             throw new JinjaRenderException("Non declared function `%s`".fmt(name));
         return prev.getFunc(name);
+    }
+
+
+    bool hasMacro(string name)
+    {
+        if (name in macros)
+            return true;
+        if (prev is null)
+            return false;
+        return prev.hasMacro(name);
+    }
+
+    
+    Macro getMacro(string name)
+    {
+        if (name in macros)
+            return macros[name];
+        if (prev is null)
+            throw new JinjaRenderException("Non declared macro `%s`".fmt(name));
+        return prev.getMacro(name);
     }
 }
 
@@ -236,26 +298,44 @@ class Render(T) : IVisitor
                         curr = curr[keyStr];
                     else if (_context.hasFunc(keyStr))
                     {
-                        auto func = _context.getFunc(keyStr);
                         auto args = [
                             "name": UniNode(keyStr),
                             "varargs": UniNode([curr]),
                             "kwargs": UniNode.emptyObject
                         ];
-                        curr = func(UniNode(args));
+                        curr = visitFunc(keyStr, UniNode(args));
+                    }
+                    else if (_context.hasMacro(keyStr))
+                    {
+                        auto args = [
+                            "name": UniNode(keyStr),
+                            "varargs": UniNode([curr]),
+                            "kwargs": UniNode.emptyObject
+                        ];
+                        curr = visitMacro(keyStr, UniNode(args));
                     }
                     else
                         throw new JinjaParserException("Unknown attribute %s".fmt(key.get!string));
                     break;
 
                 // Call of function
-                // TODO
                 case object:
+                    auto name = key["name"].get!string;
+
                     //TODO check name/varargs/kwargs
                     if (!curr.isNull)
                         key["varargs"] = UniNode([curr] ~ key["varargs"].get!(UniNode[]));
-                    auto func = _context.getFunc(key["name"].get!string);
-                    curr = func(key);
+
+                    if (_context.hasFunc(name))
+                    {
+                        curr = visitFunc(name, key);
+                    }
+                    else if (_context.hasMacro(name))
+                    {
+                        curr = visitMacro(name, key);
+                    }
+                    else
+                        throw new JinjaRenderException("Not found any macro, function or filer `%s`".fmt(name));
                     break;
 
                 case nil:
@@ -459,6 +539,83 @@ class Render(T) : IVisitor
     }
 
 
+    override void visit(MacroNode node)
+    {
+      FormArg[] args;
+
+      foreach(arg; node.args)
+      {
+          if (arg.defaultExpr.isNull)
+              args ~= FormArg(arg.name);
+          else
+          {
+              arg.defaultExpr.accept(this);
+              args ~= FormArg(arg.name, pop());
+          }
+      }
+
+      _context.macros[node.name] = Macro(args, _context, node.block);
+    }
+
+
+private:
+
+    UniNode visitFunc(string name, UniNode args)
+    {
+        return _context.getFunc(name)(args);
+    }
+
+
+    UniNode visitMacro(string name, UniNode args)
+    {
+        UniNode result;
+
+        auto macro_ = _context.getMacro(name);
+        auto stashedContext = _context;
+        _context = macro_.context.get;
+        pushNewContext();
+
+        UniNode[] varargs;
+        UniNode[string] kwargs;
+
+        foreach(arg; macro_.args)
+            if (!arg.def.isNull)
+                _context.data[arg.name] = arg.def;
+
+        for(int i = 0; i < args["varargs"].length; i++)
+        {
+            if (i < macro_.args.length)
+                _context.data[macro_.args[i].name] = args["varargs"][i];
+            else
+                varargs ~= args["varargs"][i];
+        }
+
+        //TODO to foreach after uninode fix
+        args["kwargs"].opApply(delegate(ref string key, ref UniNode value) @safe
+                {
+                    if (macro_.args.has(key))
+                        _context.data[key] = value;
+                    else
+                        kwargs[key] = value;
+                    return cast(int)0;
+                });
+
+        _context.data["varargs"] = UniNode(varargs);
+        _context.data["kwargs"] = UniNode(kwargs);
+
+        foreach(arg; macro_.args)
+            if (arg.name !in _context.data)
+                throw new JinjaRenderException("Missing value for argument `%s`".fmt(arg.name));
+
+        macro_.block.accept(this);
+        result = pop();
+        popContext();
+        _context = stashedContext;
+
+        return result;
+    }
+
+
 private:
 
 
@@ -470,8 +627,7 @@ private:
 
     void popContext()
     {
-        if (_context !is null)
-            _context = _context.prev;
+        _context = _context.previos;
     }
 
     
@@ -494,6 +650,15 @@ private:
 
 
 private:
+
+
+bool has(FormArg[] arr, string name) @safe
+{
+    foreach(a; arr)
+        if (a.name == name)
+            return true;
+    return false;
+}
 
 
 bool isNumericNode(ref UniNode n)
@@ -557,11 +722,12 @@ void toBoolType(ref UniNode n)
 }
 
 
-void toStringType(ref UniNode n)
+void toStringType(ref UniNode n) @safe
 {
     import std.algorithm : map;
     import std.string : join;
-    string doSwitch()
+
+    string doSwitch() @safe
     {
         switch (n.kind) with (UniNode.Kind)
         {
@@ -571,8 +737,16 @@ void toStringType(ref UniNode n)
             case floating: return n.get!double.to!string;
             case text: return n.get!string;
             case raw: return n.get!(ubyte[]).to!string;
-            case array: return "["~n.get!(UniNode[]).map!(a => a.getString).join(",").to!string~"]"; 
-            case object: return n.toString;
+            case array: return () @trusted {
+                            return "["~n.get!(UniNode[]).map!(a => a.getString).join(",").to!string~"]";
+                        } ();
+            case object:
+                string[] results;
+                foreach (key, ref value; n)
+                {
+                        results ~= key ~ ": " ~ value.getString;
+                }
+                return "{" ~ results.join(", ").to!string ~ "}";
             default: return "[UnknownObj: %s]".fmt(n.toString);
         }
     }
@@ -580,7 +754,7 @@ void toStringType(ref UniNode n)
 }
 
 
-string getString(UniNode n)
+string getString(UniNode n) @safe
 {
     n.toStringType;
     return n.get!string;
