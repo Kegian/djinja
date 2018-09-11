@@ -387,14 +387,17 @@ private:
     {
         auto lhs = parseAndExpr();
 
-        if (front.type == Type.Operator && front.value == Operator.Or)
+        while(true)
         {
-            pop(Operator.Or);
-            auto rhs = parseOrExpr();
-            return new BinOpNode(Operator.Or, lhs, rhs);
+            if (front.type == Type.Operator && front.value == Operator.Or)
+            {
+                pop(Operator.Or);
+                auto rhs = parseOrExpr();
+                lhs = new BinOpNode(Operator.Or, lhs, rhs);
+            }
+            else
+                return lhs;
         }
-
-        return lhs;
     }
 
     /**
@@ -405,15 +408,29 @@ private:
     {
         auto lhs = parseCmpExpr();
 
-        if (front.type == Type.Operator && front.value == Operator.And)
+        while(true)
         {
-            pop(Operator.And);
-            auto rhs = parseAndExpr();
-            return new BinOpNode(Operator.And, lhs, rhs);
+            if (front.type == Type.Operator && front.value == Operator.And)
+            {
+                pop(Operator.And);
+                auto rhs = parseAndExpr();
+                lhs = new BinOpNode(Operator.And, lhs, rhs);
+            }
+            else
+                return lhs;
         }
-
-        return lhs;
     }
+
+    /**
+      * Parse inis:
+      * inis = cmp ( (NOT)? (IN|IS) expr)?
+      */
+    Node parseInIsExpr()
+    {
+        auto lhs = parseCmpExpr();
+        return null;
+    }
+
 
     /**
       * Parse compare expression:

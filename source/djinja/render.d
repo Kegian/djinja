@@ -218,33 +218,54 @@ class Render(T) : IVisitor
 
     override void visit(BinOpNode node)
     {
-        node.lhs.accept(this);
-        node.rhs.accept(this);
 
-        auto rhs = pop();
-        auto lhs = pop();
-        UniNode res;
+        UniNode lhs, rhs, res;
+
+        UniNode calc(Operator op)()
+        {
+            node.lhs.accept(this);
+            lhs = pop();
+
+            node.rhs.accept(this);
+            rhs = pop();
+
+            return binary!op(lhs, rhs);
+        }
+
+        UniNode calcLogical(bool stopCondition)()
+        {
+            node.lhs.accept(this);
+            lhs = pop();
+            lhs.toBoolType;
+            if (lhs.get!bool == stopCondition)
+                return UniNode(stopCondition);
+
+            node.rhs.accept(this);
+            rhs = pop();
+            rhs.toBoolType;
+            return UniNode(rhs.get!bool);
+        }
 
         UniNode doSwitch()
         {
             switch (node.op) with (Operator)
             {
-                case Concat:    return binary!Concat(lhs, rhs);
-                case Plus:      return binary!Plus(lhs, rhs);
-                case Minus:     return binary!Minus(lhs,rhs);
-                case DivInt:    return binary!DivInt(lhs,rhs);
-                case DivFloat:  return binary!DivFloat(lhs,rhs);
-                case Rem:       return binary!Rem(lhs,rhs);
-                case Mul:       return binary!Mul(lhs,rhs);
-                case Greater:   return binary!Greater(lhs,rhs);
-                case Less:      return binary!Less(lhs,rhs);
-                case GreaterEq: return binary!GreaterEq(lhs,rhs);
-                case LessEq:    return binary!LessEq(lhs,rhs);
-                case Eq:        return binary!Eq(lhs,rhs);
-                case NotEq:     return binary!NotEq(lhs,rhs);
-                case Or:        return binary!Or(lhs,rhs);
-                case And:       return binary!And(lhs,rhs);
-                case Pow:       return binary!Pow(lhs,rhs);
+                case Concat:    return calc!Concat;
+                case Plus:      return calc!Plus;
+                case Minus:     return calc!Minus;
+                case DivInt:    return calc!DivInt;
+                case DivFloat:  return calc!DivFloat;
+                case Rem:       return calc!Rem;
+                case Mul:       return calc!Mul;
+                case Greater:   return calc!Greater;
+                case Less:      return calc!Less;
+                case GreaterEq: return calc!GreaterEq;
+                case LessEq:    return calc!LessEq;
+                case Eq:        return calc!Eq;
+                case NotEq:     return calc!NotEq;
+                case Pow:       return calc!Pow;
+                case Or:        return calcLogical!true;
+                case And:       return calcLogical!false;
                 default:
                     assert(0, "Not implemented binary operator");
             }
