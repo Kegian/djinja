@@ -444,48 +444,56 @@ private:
 
     /**
       * Parse math expression:
-      * mathexpr = term((PLUS|MINUS)mathexpr)?
+      * mathexpr = term((PLUS|MINUS)term)*
       */
     Node parseMathExpr()
     {
         auto lhsTerm = parseTerm();
-        if (front.type != Type.Operator)
-            return lhsTerm;
 
-        switch (front.value) with (Operator)
+        while (true)
         {
-            case Plus:
-            case Minus:
-                auto op = pop.value;
-                return new BinOpNode(op, lhsTerm, parseMathExpr());
-            default:
+            if (front.type != Type.Operator)
                 return lhsTerm;
+
+            switch (front.value) with (Operator)
+            {
+                case Plus:
+                case Minus:
+                    auto op = pop.value;
+                    lhsTerm = new BinOpNode(op, lhsTerm, parseTerm());
+                    break;
+                default:
+                    return lhsTerm;
+            }
         }
     }
 
     /**
       * Parse term:
-      * term = factor((MUL|DIVI|DIVF)term)?
+      * term = factor((MUL|DIVI|DIVF)factor)*
       */
     Node parseTerm()
     {
         auto lhsFactor = parseFactor();
-        if (front.type != Type.Operator)
-            return lhsFactor;
-    
-        switch (front.value) with (Operator)
-        {
-            case DivInt:
-            case DivFloat:
-            case Mul:
-            case Rem:
-                auto op = pop.value;
-                return new BinOpNode(op, lhsFactor, parseTerm());
 
-            default:
+        while(true)
+        {
+            if (front.type != Type.Operator)
                 return lhsFactor;
-        }
         
+            switch (front.value) with (Operator)
+            {
+                case DivInt:
+                case DivFloat:
+                case Mul:
+                case Rem:
+                    auto op = pop.value;
+                    lhsFactor = new BinOpNode(op, lhsFactor, parseFactor());
+                    break;
+                default:
+                    return lhsFactor;
+            }
+        } 
     }
 
     /**
