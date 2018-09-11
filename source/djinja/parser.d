@@ -499,12 +499,12 @@ private:
 
     /**
       * Parse unary:
-      * unary = (factor | (PLUS|MINUS|NOT)unary)
+      * unary = (pow | (PLUS|MINUS|NOT)unary)
       */
     Node parseUnary()
     {
         if (front.type != Type.Operator)
-            return parseFactor();
+            return parsePow();
 
         switch (front.value) with (Operator)
         {
@@ -518,6 +518,24 @@ private:
                 assert(0);
         }
     }
+
+    /**
+      * Parse pow:
+      * pow = factor (POW pow)?
+      */
+    Node parsePow()
+    {
+        auto lhs = parseFactor();
+
+        if (front.type == Type.Operator && front.value == Operator.Pow)
+        {
+            auto op = pop(Operator.Pow).value;
+            return new BinOpNode(op, lhs, parsePow());
+        }
+
+        return lhs;
+    }
+
 
     /**
       * Parse factor:

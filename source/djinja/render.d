@@ -244,6 +244,7 @@ class Render(T) : IVisitor
                 case NotEq:     return binary!NotEq(lhs,rhs);
                 case Or:        return binary!Or(lhs,rhs);
                 case And:       return binary!And(lhs,rhs);
+                case Pow:       return binary!Pow(lhs,rhs);
                 default:
                     assert(0, "Not implemented binary operator");
             }
@@ -884,6 +885,18 @@ UniNode binary(string op)(UniNode lhs, UniNode rhs)
     assertJinja(lhs.isIntNode, "Expected int got %s".fmt(lhs.kind));
     assertJinja(rhs.isIntNode, "Expected int got %s".fmt(rhs.kind));
     return UniNode(lhs.get!long / rhs.get!long);
+}
+
+
+
+UniNode binary(string op)(UniNode lhs, UniNode rhs)
+    if (op == Operator.Pow)
+{
+    toCommonNumType(lhs, rhs);
+    if (lhs.isIntNode)
+        return UniNode(lhs.get!long ^^ rhs.get!long);
+    else
+        return UniNode(lhs.get!double ^^ rhs.get!double);
 }
 
 
