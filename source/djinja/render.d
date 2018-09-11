@@ -989,6 +989,8 @@ UniNode binary(string op)(UniNode lhs, UniNode rhs)
 UniNode binary(string op)(UniNode lhs, UniNode rhs)
     if (op == Operator.In)
 {
+    import std.algorithm.searching : countUntil;
+
     switch (rhs.kind) with (UniNode.Kind)
     {
         case array:
@@ -1002,6 +1004,10 @@ UniNode binary(string op)(UniNode lhs, UniNode rhs)
             if (lhs.kind != UniNode.Kind.text)
                 return UniNode(false);
             return UniNode(cast(bool)(lhs.get!string in rhs));
+        case text:
+            if (lhs.kind != UniNode.Kind.text)
+                return UniNode(false);
+            return UniNode(rhs.get!string.countUntil(lhs.get!string) >= 0);
         default:
             assert(0);
     }
