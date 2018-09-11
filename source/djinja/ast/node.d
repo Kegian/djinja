@@ -31,6 +31,7 @@ alias NodeTypes = AliasSeq!(
         AssignableNode,
         MacroNode,
         CallNode,
+        InlineIfNode,
     );
 
 
@@ -87,11 +88,26 @@ class RawNode : Node
 
 class ExprNode : Node
 {
-    Node expr;
+    Nullable!Node expr;
 
     this (Node expr)
     {
-        this.expr = expr;
+        this.expr = expr.toNullable;
+    }
+
+    mixin AcceptVisitor;
+}
+
+
+class InlineIfNode : Node
+{
+    Nullable!Node expr, cond, other;
+
+    this (Node expr, Node cond, Node other)
+    {
+        this.expr = expr.toNullable;
+        this.cond = cond.toNullable;
+        this.other = other.toNullable;
     }
 
     mixin AcceptVisitor;

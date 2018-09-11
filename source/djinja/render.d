@@ -216,6 +216,32 @@ class Render(T) : IVisitor
         _result ~= n.get!string;
     }
 
+    override void visit(InlineIfNode node)
+    {
+        bool condition = true;
+
+        if (!node.cond.isNull)
+        {
+            node.cond.accept(this);
+            auto res = pop();
+            res.toBoolType;
+            condition = res.get!bool;
+        }
+
+        if (condition)
+        {
+            node.expr.accept(this);
+        }
+        else if (!node.other.isNull)
+        {
+            node.other.accept(this);
+        }
+        else
+        {
+            push(UniNode(null));
+        }
+    }
+
     override void visit(BinOpNode node)
     {
 

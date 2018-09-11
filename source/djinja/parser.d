@@ -90,11 +90,17 @@ struct Parser(Lexer)
 private: 
 
 
+    /**
+      * exprblock = EXPRBEGIN expr (IF expr (ELSE expr)? )? EXPREND
+      */
     ExprNode parseExpression()
     {
+        Node expr;
+
         pop(Type.ExprBegin);
-        auto expr = parseHighLevelExpression();
+        expr = parseHighLevelExpression();
         pop(Type.ExprEnd);
+
         return new ExprNode(expr);
     }
 
@@ -376,7 +382,34 @@ private:
 
     Node parseHighLevelExpression()
     {
-        return parseOrExpr();
+        return parseInlineIf();
+    }
+
+
+    /**
+      * inlineif = orexpr (IF orexpr (ELSE orexpr)? )?
+      */
+    InlineIfNode parseInlineIf()
+    {
+        Node expr;
+        Node cond = null;
+        Node other = null;
+
+        expr = parseOrExpr();
+
+        if (front == Keyword.If)
+        {
+            pop(Keyword.If);
+            cond = parseOrExpr();
+
+            if (front == Keyword.Else)
+            {
+                pop(Keyword.Else);
+                other = parseOrExpr();
+            }
+        }
+
+        return new InlineIfNode(expr, cond, other);
     }
 
     /**

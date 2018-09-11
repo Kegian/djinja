@@ -55,6 +55,41 @@ class Printer : NullVisitor
     }
 
 
+    override void visit(InlineIfNode node)
+    {
+        print("InlineIf block:");
+
+        _tab++;
+
+        if (node.cond.isNull)
+            print("If: NONE");
+        else
+        {
+            print("If:");
+            _tab++;
+            node.cond.accept(this);
+            _tab--;
+        }
+        
+        if (node.other.isNull)
+            print("Else: NONE");
+        else
+        {
+            print("Else:");
+            _tab++;
+            node.other.accept(this);
+            _tab--;
+        }
+
+        print("Expression:");
+        _tab++;
+        node.expr.accept(this);
+        _tab--;
+
+        _tab--;
+    }
+
+
     override void visit(BinOpNode node)
     {
         print("BinaryOp: %s".fmt(node.op));
