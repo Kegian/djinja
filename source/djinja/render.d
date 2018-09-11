@@ -335,7 +335,7 @@ class Render(T) : IVisitor
                         curr = visitMacro(name, key);
                     }
                     else
-                        throw new JinjaRenderException("Not found any macro, function or filer `%s`".fmt(name));
+                        throw new JinjaRenderException("Not found any macro, function or filter `%s`".fmt(name));
                     break;
 
                 case nil:
@@ -541,20 +541,44 @@ class Render(T) : IVisitor
 
     override void visit(MacroNode node)
     {
-      FormArg[] args;
+        FormArg[] args;
 
-      foreach(arg; node.args)
-      {
-          if (arg.defaultExpr.isNull)
-              args ~= FormArg(arg.name);
-          else
-          {
-              arg.defaultExpr.accept(this);
-              args ~= FormArg(arg.name, pop());
-          }
-      }
+        foreach(arg; node.args)
+        {
+            if (arg.defaultExpr.isNull)
+                args ~= FormArg(arg.name);
+            else
+            {
+                arg.defaultExpr.accept(this);
+                args ~= FormArg(arg.name, pop());
+            }
+        }
 
-      _context.macros[node.name] = Macro(args, _context, node.block);
+        _context.macros[node.name] = Macro(args, _context, node.block);
+    }
+
+
+    override void visit(CallNode node)
+    {
+        FormArg[] args;
+
+        foreach(arg; node.formArgs)
+        {
+            if (arg.defaultExpr.isNull)
+                args ~= FormArg(arg.name);
+            else
+            {
+                arg.defaultExpr.accept(this);
+                args ~= FormArg(arg.name, pop());
+            }
+        }
+
+        auto caller = Macro(args, _context, node.block);
+
+        node.factArgs.accept(this);
+        auto factArgs = pop();
+
+        visitMacro(node.macroName, factArgs, caller.nullable);
     }
 
 
@@ -566,7 +590,7 @@ private:
     }
 
 
-    UniNode visitMacro(string name, UniNode args)
+    UniNode visitMacro(string name, UniNode args, Nullable!Macro caller = Nullable!Macro.init)
     {
         UniNode result;
 
@@ -607,8 +631,12 @@ private:
             if (arg.name !in _context.data)
                 throw new JinjaRenderException("Missing value for argument `%s`".fmt(arg.name));
 
+        if (!caller.isNull)
+            _context.macros["caller"] = caller;
+
         macro_.block.accept(this);
         result = pop();
+
         popContext();
         _context = stashedContext;
 

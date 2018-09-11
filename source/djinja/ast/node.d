@@ -2,7 +2,7 @@ module djinja.ast.node;
 
 public
 {
-    import std.typecons : Nullable;
+    import std.typecons : Nullable, nullable;
 }
 
 private
@@ -29,6 +29,7 @@ alias NodeTypes = AliasSeq!(
         SetNode,
         AssignableNode,
         MacroNode,
+        CallNode,
     );
 
 
@@ -284,18 +285,6 @@ class SetNode : Node
 
 class MacroNode : Node
 {
-    struct Arg
-    {
-        string name;
-        Nullable!Node defaultExpr;
-
-        this(string name, Node def)
-        {
-            this.name = name;
-            this.defaultExpr = def.toNullable;
-        }
-    }
-
     string name;
     Arg[] args;
     Nullable!Node block;
@@ -311,6 +300,40 @@ class MacroNode : Node
 
     mixin AcceptVisitor;
 }
+
+
+class CallNode : Node
+{
+    string macroName;
+    Arg[] formArgs;
+    Nullable!Node factArgs;
+    Nullable!Node block;
+
+    this(string macroName, Arg[] formArgs, Node factArgs, Node block)
+    {
+        this.macroName = macroName;
+        this.formArgs = formArgs;
+        this.factArgs = factArgs.toNullable;
+        this.block = block.toNullable;
+    }
+
+    mixin AcceptVisitor;
+}
+
+
+
+struct Arg
+{
+    string name;
+    Nullable!Node defaultExpr;
+
+    this(string name, Node def)
+    {
+        this.name = name;
+        this.defaultExpr = def.toNullable;
+    }
+}
+
 
 
 auto toNullable(T)(T val)

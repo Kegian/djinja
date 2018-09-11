@@ -144,6 +144,7 @@ private:
             case For:   return parseFor();
             case Set:   return parseSet();
             case Macro: return parseMacro();
+            case Call:  return parseCall();
             default:
                 assert(0, "Not implemented kw %s".fmt(front.value));
         }
@@ -282,39 +283,15 @@ private:
 
     MacroNode parseMacro()
     {
-        alias Arg = MacroNode.Arg;
-
-        Arg[] args = [];
-        bool isVarargs = true;
-        void parseArgs()
-        {
-            while(front.type != Type.EOF && front.type != Type.RParen)
-            {
-                auto name = pop(Type.Ident).value;
-                Node def = null;
-
-                if (!isVarargs || front.type == Type.Operator && front.value == Operator.Assign)
-                {
-                    isVarargs = false;
-                    pop(Operator.Assign);
-                    def = parseHighLevelExpression();
-                }
-
-                args ~= Arg(name, def);
-                
-                if (front.type != Type.RParen)
-                    pop(Type.Comma);
-            }
-        }
-
         pop(Keyword.Macro);
 
         auto name = pop(Type.Ident).value;
+        Arg[] args;
 
         if (front.type == Type.LParen)
         {
             pop(Type.LParen);
-            parseArgs();
+            args = parseFormalArgs();
             pop(Type.RParen);
         }
 
@@ -338,6 +315,61 @@ private:
         pop(Type.StmtEnd);
 
         return new MacroNode(name, args, block, ret);
+    }
+
+    
+    CallNode parseCall()
+    {
+        pop(Keyword.Call);
+        
+        Arg[] formalArgs;
+
+        if (front.type == Type.LParen)
+        {
+            pop(Type.LParen);
+            formalArgs = parseFormalArgs();
+            pop(Type.RParen);
+        }
+
+        auto macroName = front.value;
+        auto factArgs = parseCallExpr();
+
+        pop(Type.StmtEnd);
+
+        auto block = parseStatementBlock();
+        block.children ~= new StringNode("");
+
+        pop(Type.StmtBegin);
+        pop(Keyword.EndCall);
+        pop(Type.StmtEnd);
+
+        return new CallNode(macroName, formalArgs, factArgs, block);
+    }
+
+    
+    Arg[] parseFormalArgs()
+    {
+        Arg[] args = [];
+        bool isVarargs = true;
+
+        while(front.type != Type.EOF && front.type != Type.RParen)
+        {
+            auto name = pop(Type.Ident).value;
+            Node def = null;
+
+            if (!isVarargs || front.type == Type.Operator && front.value == Operator.Assign)
+            {
+                isVarargs = false;
+                pop(Operator.Assign);
+                def = parseHighLevelExpression();
+            }
+
+            args ~= Arg(name, def);
+            
+            if (front.type != Type.RParen)
+                pop(Type.Comma);
+        }
+        return args;
     }
 
 
@@ -516,7 +548,13 @@ private:
     }
 
 
-    Node parseCallExpr()
+    IdentNode parseCallIdent()
+    {
+        return new IdentNode("", [parseCallExpr()]);
+    }
+
+
+    DictNode parseCallExpr()
     {
         string name = pop(Type.Ident).value;
         Node[] varargs;
@@ -536,17 +574,20 @@ private:
                 varargs ~= parseHighLevelExpression();
         }
 
-        pop(Type.LParen);
-
-        while (front.type != Type.EOF && front.type != Type.RParen)
+        if (front.type == Type.LParen)
         {
-            parse();
+            pop(Type.LParen);
 
-            if (front.type != Type.RParen)
-                pop(Type.Comma);
+            while (front.type != Type.EOF && front.type != Type.RParen)
+            {
+                parse();
+
+                if (front.type != Type.RParen)
+                    pop(Type.Comma);
+            }
+
+            pop(Type.RParen);
         }
-
-        pop(Type.RParen);
 
         Node[string] callDict;
         callDict["name"] = new StringNode(name);

@@ -252,6 +252,53 @@ class Printer : NullVisitor
     }
 
 
+    override void visit(CallNode node)
+    {
+        print("Call: '%s'".fmt(node.macroName));
+
+        _tab++;
+
+        if (!node.formArgs.length)
+            print("Formal args: NONE");
+        else
+        {
+            print("Formal args:");
+            _tab++;
+            foreach(arg; node.formArgs)
+            {
+                print("Name: %s".fmt(arg.name));
+                if (!arg.defaultExpr.isNull)
+                {
+                    _tab++;
+                    print("Default:");
+                    _tab++;
+                    arg.defaultExpr.accept(this);
+                    _tab--;
+                    _tab--;
+                }
+            }
+            _tab--;
+        }
+
+        if (node.factArgs.isNull)
+            print("Fact args: NONE");
+        else
+        {
+            print("Fact args:");
+            _tab++;
+            node.factArgs.accept(this);
+            _tab--;
+        }
+
+        print("Body:");
+        _tab++;
+        node.block.accept(this);
+        _tab--;
+
+        _tab--;
+    }
+
+
     void print(string str)
     {
         foreach(i; 0 .. _tab)
