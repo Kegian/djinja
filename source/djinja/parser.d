@@ -615,6 +615,7 @@ private:
             case Integer: return new NumNode(pop.value.to!long);
             case Float:   return new NumNode(pop.value.to!double);
             case String:  return new StringNode(pop.value);
+            case Boolean: return new BooleanNode(pop.value.to!bool);
             case LParen:  return parseTuple();
             case LSParen: return parseList();
             case LBrace:  return parseDict();

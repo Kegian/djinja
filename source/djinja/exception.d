@@ -11,7 +11,7 @@ class JinjaException : Exception
 
 
 
-class JinjaLexerException : Exception
+class JinjaLexerException : JinjaException
 {
     this(string msg, string file = __FILE__, size_t line = __LINE__)
     {
@@ -21,7 +21,7 @@ class JinjaLexerException : Exception
 
 
 
-class JinjaParserException : Exception
+class JinjaParserException : JinjaException
 {
     this(string msg, string file = __FILE__, size_t line = __LINE__)
     {
@@ -31,7 +31,7 @@ class JinjaParserException : Exception
 
 
 
-class JinjaRenderException : Exception
+class JinjaRenderException : JinjaException
 {
     this(string msg, string file = __FILE__, size_t line = __LINE__)
     {
@@ -40,4 +40,13 @@ class JinjaRenderException : Exception
 }
 
 
+void assertJinja(E : JinjaException)(bool expr, string msg = "", string file = __FILE__, size_t line = __LINE__)
+{
+    if (!expr)
+        throw new JinjaException(msg, file, line);
+}
 
+
+alias assertJinjaLexer = assertJinja!JinjaLexerException;
+alias assertJinjaParser = assertJinja!JinjaParserException;
+alias assertJinjaRender = assertJinja!JinjaRenderException;

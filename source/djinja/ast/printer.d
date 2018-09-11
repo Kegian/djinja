@@ -80,6 +80,11 @@ class Printer : NullVisitor
             print("Float: %f".fmt(node.data._float));
     }
 
+    override void visit(BooleanNode node)
+    {
+        print("Bool: %s".fmt(node.boolean));
+    }
+
     override void visit(IdentNode node)
     {
         print("Ident: '%s'".fmt(node.name));

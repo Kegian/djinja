@@ -20,6 +20,7 @@ alias NodeTypes = AliasSeq!(
         UnaryOpNode,
         BinOpNode,
         StringNode,
+        BooleanNode,
         ListNode,
         DictNode,
         NumNode,
@@ -155,6 +156,19 @@ class NumNode : Node
     {
         data._float = num;
         type = Type.Float;
+    }
+
+    mixin AcceptVisitor;
+}
+
+
+class BooleanNode : Node
+{
+    bool boolean;
+
+    this(bool boolean)
+    {
+        this.boolean = boolean;
     }
 
     mixin AcceptVisitor;

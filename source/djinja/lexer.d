@@ -26,6 +26,7 @@ enum Type
     Ident,
     Integer,
     Float,
+    Boolean,
     String,
 
     LParen,
@@ -87,6 +88,13 @@ Keyword toKeyword(string key)
 bool isKeyword(string key)
 {
     return key.toKeyword != Keyword.Unknown;
+}
+
+
+bool isBoolean(string key)
+{
+    return key == "true" || key == "false" ||
+           key == "True" || key == "False";
 }
 
 
@@ -281,6 +289,8 @@ struct Lexer(
                 auto ident = popIdent();
                 if (ident.toKeyword != Keyword.Unknown)
                     return Token(Type.Keyword, ident);
+                else if (ident.isBoolean)
+                    return Token(Type.Boolean, ident);
                 else
                     return Token(Type.Ident, ident);
 
