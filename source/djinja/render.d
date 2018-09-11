@@ -234,6 +234,7 @@ class Render(T) : IVisitor
                 case Minus:     return binary!Minus(lhs,rhs);
                 case DivInt:    return binary!DivInt(lhs,rhs);
                 case DivFloat:  return binary!DivFloat(lhs,rhs);
+                case Rem:       return binary!Rem(lhs,rhs);
                 case Mul:       return binary!Mul(lhs,rhs);
                 case Greater:   return binary!Greater(lhs,rhs);
                 case Less:      return binary!Less(lhs,rhs);
@@ -244,7 +245,7 @@ class Render(T) : IVisitor
                 case Or:        return binary!Or(lhs,rhs);
                 case And:       return binary!And(lhs,rhs);
                 default:
-                    assert(0, "Not implemented yet");
+                    assert(0, "Not implemented binary operator");
             }
         }
 
@@ -253,10 +254,21 @@ class Render(T) : IVisitor
 
     override void visit(UnaryOpNode node)
     {
-        // print("UnaryOp: %s".fmt(node.op));
-        _tab++;
         node.expr.accept(this);
-        _tab--;
+        auto res = pop();
+        UniNode doSwitch()
+        {
+            switch (node.op) with (Operator)
+            {
+                case Plus:      return unary!Plus(res);
+                case Minus:     return unary!Minus(res);
+                case Not:       return unary!Not(res);
+                default:
+                    assert(0, "Not implemented unary operator");
+            }
+        }
+
+        push(doSwitch());
     }
 
     override void visit(NumNode node)
@@ -760,10 +772,10 @@ void toBoolType(ref UniNode n)
             return;
         case integer:
         case uinteger:
-            n = UniNode(n.get!long > 0);
+            n = UniNode(n.get!long != 0);
             return;
         case floating:
-            n = UniNode(n.get!double > 0);
+            n = UniNode(n.get!double != 0);
             return;
         case text:
             n = UniNode(n.get!string.length > 0);
@@ -825,11 +837,36 @@ void checkNodeType(ref UniNode n, UniNode.Kind kind)
 
 
 
+UniNode unary(string op)(UniNode lhs)
+    if (op.among!(Operator.Plus,
+                 Operator.Minus)
+    )
+{
+    assertJinja(lhs.isIntNode, "Expected int got %s".fmt(lhs.kind));
+
+    if (lhs.isIntNode)
+        return UniNode(mixin(op ~ "lhs.get!long"));
+    else
+        return UniNode(mixin(op ~ "lhs.get!double"));
+}
+
+
+
+UniNode unary(string op)(UniNode lhs)
+    if (op == Operator.Not)
+{
+    lhs.toBoolType;
+    return UniNode(!lhs.get!bool);
+}
+
+
+
 UniNode binary(string op)(UniNode lhs, UniNode rhs)
     if (op.among!(Operator.Plus,
                  Operator.Minus,
                  Operator.Mul,
-                 Operator.DivFloat)
+                 Operator.DivFloat,
+                 Operator.Rem)
     )
 {
     toCommonNumType(lhs, rhs);
@@ -838,6 +875,7 @@ UniNode binary(string op)(UniNode lhs, UniNode rhs)
     else
         return UniNode(mixin("lhs.get!double" ~ op ~ "rhs.get!double"));
 }
+
 
 
 UniNode binary(string op)(UniNode lhs, UniNode rhs)
@@ -849,12 +887,14 @@ UniNode binary(string op)(UniNode lhs, UniNode rhs)
 }
 
 
+
 UniNode binary(string op)(UniNode lhs, UniNode rhs)
     if (op.among!(Operator.Eq, Operator.NotEq))
 {
     toCommonCmpType(lhs, rhs);
     return UniNode(mixin("lhs" ~ op ~ "rhs"));
 }
+
 
 
 UniNode binary(string op)(UniNode lhs, UniNode rhs)
@@ -880,6 +920,7 @@ UniNode binary(string op)(UniNode lhs, UniNode rhs)
 }
 
 
+
 UniNode binary(string op)(UniNode lhs, UniNode rhs)
     if (op == Operator.Or)
 {
@@ -889,6 +930,7 @@ UniNode binary(string op)(UniNode lhs, UniNode rhs)
 }
 
 
+
 UniNode binary(string op)(UniNode lhs, UniNode rhs)
     if (op == Operator.And)
 {
@@ -896,6 +938,7 @@ UniNode binary(string op)(UniNode lhs, UniNode rhs)
     rhs.toBoolType;
     return UniNode(lhs.get!bool && rhs.get!bool);
 }
+
 
 
 UniNode binary(string op)(UniNode lhs, UniNode rhs)

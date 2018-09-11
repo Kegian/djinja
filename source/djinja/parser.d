@@ -7,7 +7,8 @@ private
 
     import djinja.ast;
     import djinja.lexer;
-    import djinja.exception;
+    import djinja.exception : JinjaParserException,
+                              assertJinja = assertJinjaParser;
 }
 
 
@@ -470,11 +471,11 @@ private:
 
     /**
       * Parse term:
-      * term = factor((MUL|DIVI|DIVF)factor)*
+      * term = unary((MUL|DIVI|DIVF|REM)unary)*
       */
     Node parseTerm()
     {
-        auto lhsFactor = parseFactor();
+        auto lhsFactor = parseUnary();
 
         while(true)
         {
@@ -488,7 +489,7 @@ private:
                 case Mul:
                 case Rem:
                     auto op = pop.value;
-                    lhsFactor = new BinOpNode(op, lhsFactor, parseFactor());
+                    lhsFactor = new BinOpNode(op, lhsFactor, parseUnary());
                     break;
                 default:
                     return lhsFactor;
@@ -497,8 +498,30 @@ private:
     }
 
     /**
+      * Parse unary:
+      * unary = (factor | (PLUS|MINUS|NOT)unary)
+      */
+    Node parseUnary()
+    {
+        if (front.type != Type.Operator)
+            return parseFactor();
+
+        switch (front.value) with (Operator)
+        {
+            case Plus:
+            case Minus:
+            case Not:
+                auto op = pop.value;
+                return new UnaryOpNode(op, parseUnary());
+            default:
+                assertJinja(0, "Unexpected operator `%s`".fmt(front.value));
+                assert(0);
+        }
+    }
+
+    /**
       * Parse factor:
-      * factor = (ident|tuple|LPAREN HighLevelExpr RPAREN|literal)
+      * factor = (ident|(tuple|LPAREN HighLevelExpr RPAREN)|literal)
       */
     Node parseFactor()
     {
@@ -742,7 +765,7 @@ private:
     Token pop(Type t)
     {
         if (front.type != t)
-            throw new JinjaException("Unexpected token %s, expected: %s".fmt(front.value, t));
+            throw new JinjaParserException("Unexpected token %s, expected: %s".fmt(front.value, t));
         return pop();
     }
 
@@ -750,7 +773,7 @@ private:
     Token pop(Keyword kw)
     {
         if (front.type != Type.Keyword || front.value != kw)
-            throw new JinjaException("Unexpected token %s, expected kw: %s".fmt(front.value, kw));
+            throw new JinjaParserException("Unexpected token %s, expected kw: %s".fmt(front.value, kw));
         return pop();
     }
 
@@ -758,7 +781,7 @@ private:
     Token pop(Operator op)
     {
         if (front.type != Type.Operator || front.value != op)
-            throw new JinjaException("Unexpected token %s, expected op: %s".fmt(front.value, op));
+            throw new JinjaParserException("Unexpected token %s, expected op: %s".fmt(front.value, op));
         return pop();
     }
 }
