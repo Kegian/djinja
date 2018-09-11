@@ -264,6 +264,7 @@ class Render(T) : IVisitor
                 case Eq:        return calc!Eq;
                 case NotEq:     return calc!NotEq;
                 case Pow:       return calc!Pow;
+                case In:        return calc!In;
                 case Or:        return calcLogical!true;
                 case And:       return calcLogical!false;
                 default:
@@ -981,4 +982,27 @@ UniNode binary(string op)(UniNode lhs, UniNode rhs)
     lhs.toStringType;
     rhs.toStringType;
     return UniNode(lhs.get!string ~ rhs.get!string);
+}
+
+
+
+UniNode binary(string op)(UniNode lhs, UniNode rhs)
+    if (op == Operator.In)
+{
+    switch (rhs.kind) with (UniNode.Kind)
+    {
+        case array:
+            foreach(val; rhs)
+            {
+                if (val == lhs)
+                    return UniNode(true);
+            }
+            return UniNode(false);
+        case object:
+            if (lhs.kind != UniNode.Kind.text)
+                return UniNode(false);
+            return UniNode(cast(bool)(lhs.get!string in rhs));
+        default:
+            assert(0);
+    }
 }

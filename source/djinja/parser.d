@@ -392,7 +392,7 @@ private:
             if (front.type == Type.Operator && front.value == Operator.Or)
             {
                 pop(Operator.Or);
-                auto rhs = parseOrExpr();
+                auto rhs = parseAndExpr();
                 lhs = new BinOpNode(Operator.Or, lhs, rhs);
             }
             else
@@ -402,18 +402,18 @@ private:
 
     /**
       * Parse And Expression:
-      * and = cmp (AND and)?
+      * and = inis (AND inis)*
       */
     Node parseAndExpr()
     {
-        auto lhs = parseCmpExpr();
+        auto lhs = parseInIsExpr();
 
         while(true)
         {
             if (front.type == Type.Operator && front.value == Operator.And)
             {
                 pop(Operator.And);
-                auto rhs = parseAndExpr();
+                auto rhs = parseInIsExpr();
                 lhs = new BinOpNode(Operator.And, lhs, rhs);
             }
             else
@@ -423,12 +423,29 @@ private:
 
     /**
       * Parse inis:
-      * inis = cmp ( (NOT)? (IN|IS) expr)?
+      * inis = cmp ( (NOT)? (IN expr |IS expr TODO) )?
       */
     Node parseInIsExpr()
     {
-        auto lhs = parseCmpExpr();
-        return null;
+        auto inis = parseCmpExpr();
+
+        bool hasNot = false;
+        if (front == Operator.Not && (next == Operator.In || next == Operator.Is))
+        {
+            pop(Operator.Not);
+            hasNot = true;
+        }
+
+        if (front == Operator.In || front == Operator.Is)
+        {
+            auto op = pop().value;
+            auto rhs = parseHighLevelExpression();
+            inis = new BinOpNode(op, inis, rhs);
+            if (hasNot)
+                inis = new UnaryOpNode(Operator.Not, inis);
+        }
+
+        return inis;
     }
 
 

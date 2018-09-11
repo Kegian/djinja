@@ -178,6 +178,18 @@ struct Token
         type = t;
         value = v;
     }
+
+    bool opEquals(Type type){
+        return this.type == type;
+    }
+
+    bool opEquals(Keyword kw){
+        return this.type == Type.Keyword && value == kw;
+    }
+
+    bool opEquals(Operator op){
+        return this.type == Type.Operator && value == op;
+    }
 }
 
 
