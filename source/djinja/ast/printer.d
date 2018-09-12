@@ -225,7 +225,18 @@ class Printer : NullVisitor
         node.block.accept(this);
         _tab--;
 
-        if (node.other)
+        if (!node.cond.isNull)
+        {
+            print("Condition:");
+            _tab++;
+            node.cond.accept(this);
+            _tab--;
+        }
+        else
+            print("Condition: NONE");
+
+
+        if (!node.other.isNull)
         {
             print("Else:");
             _tab++;
@@ -234,6 +245,8 @@ class Printer : NullVisitor
         }
         else
             print("Else: NONE");
+
+        print("Recursive: %s".fmt(node.isRecursive));
 
         _tab--;
     }

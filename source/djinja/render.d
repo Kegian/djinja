@@ -586,45 +586,79 @@ class Render(T) : IVisitor
 
     override void visit(ForNode node)
     {
-        node.iterable.accept(this);
+        bool iterated = false;
 
-        UniNode iterable = pop();
+        bool calcCondition() @safe
+        {
+            bool condition = true;
+            if (!node.cond.isNull)
+            {
+                () @trusted {
+                    node.cond.accept(this);
+                    auto cond = pop();
+                    cond.toBoolType;
+                    condition = cond.get!bool;
+                } ();
+            }
+            return condition;
+        }
+
+        void iterate(UniNode iterable) @safe
+        {
+            if (node.key.length)
+            {
+                iterable.checkNodeType(UniNode.Kind.object);
+                foreach(idx, ref obj; iterable)
+                {
+                    () @trusted {
+                        if (node.isRecursive && obj.kind == UniNode.Kind.object)
+                            iterate(obj);
+                        else
+                        {
+                            _context.data[node.key] = UniNode(idx);
+                            _context.data[node.value] = obj;
+                            if (calcCondition())
+                            {
+                                // TODO UPDATE LOOP VARS
+                                node.block.accept(this);
+                                iterated = true;
+                            }
+                        }
+                    } ();
+                }
+            }
+            else
+            {
+                iterable.checkNodeType(UniNode.Kind.array);
+                foreach(ref it; iterable)
+                {
+                    () @trusted {
+                        if (node.isRecursive && it.kind == UniNode.Kind.array)
+                            iterate(it);
+                        else
+                        {
+                            _context.data[node.value] = it;
+                            if (calcCondition())
+                            {
+                                // TODO UPDATE LOOP VARS
+                                node.block.accept(this);
+                                iterated = true;
+                            }
+                        }
+                    } ();
+                }
+            }
+        }
 
         pushNewContext();
 
-        bool iterated = false;
-
-        if (node.key.length)
-        {
-            iterable.checkNodeType(UniNode.Kind.object);
-            foreach(idx, ref obj; iterable)
-            {
-                () @trusted {
-                    _context.data[node.key] = UniNode(idx);
-                    _context.data[node.value] = obj;
-                    // TODO UPDATE LOOP VARS
-                    node.block.accept(this);
-                    iterated = true;
-                } ();
-            }
-        }
-        else
-        {
-            iterable.checkNodeType(UniNode.Kind.array);
-            foreach(ref it; iterable)
-            {
-                () @trusted {
-                    _context.data[node.value] = it;
-                    // TODO UPDATE LOOP VARS
-                    node.block.accept(this);
-                    iterated = true;
-                } ();
-            }
-        }
+        node.iterable.accept(this);
+        UniNode iterable = pop();
+        iterate(iterable);
 
         popContext();
 
-        if (!iterated && node.other !is null)
+        if (!iterated && !node.other.isNull)
             node.other.accept(this);
     }
 

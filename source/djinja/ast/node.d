@@ -249,18 +249,21 @@ class IfNode : Node
 class ForNode : Node
 {
     string key, value;
-    Node iterable;
-    Node block;
-    Node other;
+    Nullable!Node iterable;
+    Nullable!Node block;
+    Nullable!Node other;
+    Nullable!Node cond;
+    bool isRecursive;
 
-
-    this(string key, string value, Node iterable, Node block, Node other)
+    this(string key, string value, Node iterable, Node block, Node other, Node cond, bool isRecursive)
     {
         this.key = key;
         this.value = value;
-        this.iterable = iterable;
-        this.block = block;
-        this.other = other;
+        this.iterable = iterable.toNullable;
+        this.block = block.toNullable;
+        this.other = other.toNullable;
+        this.cond = cond.toNullable;
+        this.isRecursive = isRecursive;
     }
 
     mixin AcceptVisitor;

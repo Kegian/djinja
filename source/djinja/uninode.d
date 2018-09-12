@@ -45,6 +45,14 @@ bool isFloatNode(ref UniNode n)
 }
 
 
+bool isIterableNode(ref UniNode n)
+{
+    return cast(bool)n.kind.among!(
+            UniNode.Kind.array,
+            UniNode.Kind.object
+        );
+}
+
 void toCommonNumType(ref UniNode n1, ref UniNode n2)
 {
     assertJinja(n1.isNumericNode, "Not a numeric type of %s".fmt(n1));
@@ -142,7 +150,7 @@ void toStringType(ref UniNode n) @safe
 }
 
 
-void checkNodeType(ref UniNode n, UniNode.Kind kind)
+void checkNodeType(ref UniNode n, UniNode.Kind kind) @safe
 {
     if (n.kind != kind)
         throw new JinjaRenderException("Unexpected expression type %s, expcted %s".fmt(n.kind, kind));

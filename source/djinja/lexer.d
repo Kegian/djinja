@@ -49,6 +49,7 @@ enum Keyword : string
 {
     Unknown = "",
     For = "for",
+    Recursive = "recursive",
     EndFor = "endfor",
     If = "if",
     ElIf = "elif",
