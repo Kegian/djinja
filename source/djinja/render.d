@@ -352,6 +352,11 @@ class Render(T) : IVisitor
         push(UniNode(node.boolean));
     }
 
+    override void visit(NilNode node)
+    {
+        push(UniNode(null));
+    }
+
     override void visit(IdentNode node)
     {
         UniNode curr;
@@ -1052,6 +1057,6 @@ UniNode binary(string op)(UniNode lhs, UniNode rhs)
                 return UniNode(false);
             return UniNode(rhs.get!string.countUntil(lhs.get!string) >= 0);
         default:
-            assert(0);
+            return UniNode(false);
     }
 }

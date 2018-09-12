@@ -120,6 +120,11 @@ class Printer : NullVisitor
         print("Bool: %s".fmt(node.boolean));
     }
 
+    override void visit(NilNode node)
+    {
+        print("Nil");
+    }
+
     override void visit(IdentNode node)
     {
         print("Ident: '%s'".fmt(node.name));

@@ -21,6 +21,7 @@ alias NodeTypes = AliasSeq!(
         BinOpNode,
         StringNode,
         BooleanNode,
+        NilNode,
         ListNode,
         DictNode,
         NumNode,
@@ -187,6 +188,12 @@ class BooleanNode : Node
         this.boolean = boolean;
     }
 
+    mixin AcceptVisitor;
+}
+
+
+class NilNode : Node
+{
     mixin AcceptVisitor;
 }
 

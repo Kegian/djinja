@@ -317,7 +317,7 @@ private:
             ret = true;
         }
         else
-            block.children ~= new StringNode("");
+            block.children ~= new NilNode;
 
         pop(Type.StmtEnd);
 
