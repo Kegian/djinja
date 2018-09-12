@@ -460,7 +460,7 @@ private:
 
     /**
       * Parse inis:
-      * inis = cmp ( (NOT)? (IN expr |IS expr TODO) )?
+      * inis = cmp ( (NOT)? (IN expr |IS callexpr) )?
       */
     Node parseInIsExpr()
     {
@@ -473,14 +473,22 @@ private:
             hasNot = true;
         }
 
-        if (front == Operator.In || front == Operator.Is)
+        if (front == Operator.In)
         {
             auto op = pop().value;
             auto rhs = parseHighLevelExpression();
             inis = new BinOpNode(op, inis, rhs);
-            if (hasNot)
-                inis = new UnaryOpNode(Operator.Not, inis);
         }
+
+        if (front == Operator.Is)
+        {
+            auto op = pop().value;
+            auto rhs = parseCallExpr();
+            inis = new BinOpNode(op, inis, rhs);
+        }
+
+        if (hasNot)
+            inis = new UnaryOpNode(Operator.Not, inis);
 
         return inis;
     }
@@ -488,46 +496,52 @@ private:
 
     /**
       * Parse compare expression:
-      * cmp = filterexpr (CMPOP filterexpr)?
+      * cmp = concatexpr (CMPOP concatexpr)?
       */
     Node parseCmpExpr()
     {
-        auto lhs = parseFilterExpr();
+        auto lhs = parseConcatExpr();
 
         if (front.type == Type.Operator && front.value.toOperator.isCmpOperator)
-            return new BinOpNode(pop.value, lhs, parseFilterExpr);
+        {
+            auto op = pop(Type.Operator).value;
+            return new BinOpNode(op, lhs, parseConcatExpr());
+        }
 
         return lhs;
     }
 
     /**
-      * filterexpr = concatexpr (FILTER callexpr)*
-      */
-    Node parseFilterExpr()
-    {
-        auto filterexpr = parseConcatExpr();
-
-        while (front == Operator.Filter)
-        {
-            pop(Operator.Filter);
-            filterexpr = new BinOpNode(Operator.Filter, filterexpr, parseCallExpr());
-        }
-
-        return filterexpr;
-    }
-
-    /**
       * Parse expression:
-      * concatexpr = mathexpr (CONCAT concatexpr)?
+      * concatexpr = filterexpr (CONCAT filterexpr)*
       */
     Node parseConcatExpr()
     {
-        auto lhsTerm = parseMathExpr();
+        auto lhsTerm = parseFilterExpr();
 
-        if (front.type != Type.Operator || front.value != Operator.Concat)
-            return lhsTerm;
+        while (front == Operator.Concat)
+        {
+            auto op = pop(Operator.Concat).value;
+            lhsTerm = new BinOpNode(op, lhsTerm, parseFilterExpr());
+        }
 
-        return new BinOpNode(pop(Operator.Concat).value, lhsTerm, parseConcatExpr());
+        return lhsTerm;
+    }
+
+    /**
+      * filterexpr = mathexpr (FILTER callexpr)*
+      */
+    Node parseFilterExpr()
+    {
+        auto filterexpr = parseMathExpr();
+
+        while (front == Operator.Filter)
+        {
+            auto op = pop(Operator.Filter).value;
+            filterexpr = new BinOpNode(op, filterexpr, parseCallExpr());
+        }
+
+        return filterexpr;
     }
 
     /**

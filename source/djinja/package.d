@@ -15,7 +15,6 @@ module djinja;
 public
 {
     import djinja.ast;
-    import djinja.djinja;
     import djinja.exception;
     import djinja.lexer;
     import djinja.parser;

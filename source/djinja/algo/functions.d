@@ -2,24 +2,22 @@ module djinja.algo.functions;
 
 private
 {
-    import uninode.core;
-
     import djinja.algo.wrapper;
     import djinja.exception : assertJinja = assertJinjaException;
+    import djinja.uninode;
 }
 
-auto functionList()
+
+immutable(UniNode function(UniNode))[string] globalFunctions()
 {
     return cast(immutable)
         [
             "range": &range,
             "length": &length,
-            "myRange": &(wrapper!myRange),
+            "myRange": &wrapper!myRange,
         ];
 }
 
-
-alias Function = UniNode function(UniNode);
 
 
 UniNode range(UniNode params)

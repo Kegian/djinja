@@ -5,13 +5,11 @@ private
     import std.algorithm : min;
     import std.format : fmt = format;
     import std.traits;
-    import std.functional : toDelegate;
     import std.typecons : Tuple;
     import std.string : join;
 
-    import uninode.core;
-    import uninode.serialization;
     import djinja.exception : assertJinja = assertJinjaException;
+    import djinja.uninode;
 }
 
 
@@ -21,7 +19,6 @@ template wrapper(alias F)
     alias ParameterIdents = ParameterIdentifierTuple!F;
     alias ParameterTypes = Parameters!F;
     alias ParameterDefs = ParameterDefaults!F;
-    alias Type = typeof(toDelegate(&F));
     alias RT = ReturnType!F;
     alias PT = Tuple!ParameterTypes;
 
@@ -46,10 +43,11 @@ template wrapper(alias F)
 
         void fillArg(size_t idx, PType)(string key, UniNode val)
         {
+            // TODO toBoolType, toStringType
             try
-                args[idx] = val.deserializeUniNode!PType;
+                args[idx] = val.deserialize!PType;
             catch
-                assertJinja(0, "Can't deserialize param `%s` from `%s` to `%s` in func `%s`"
+                assertJinja(0, "Can't deserialize param `%s` from `%s` to `%s` in function `%s`"
                                         .fmt(key, val.kind, PType.stringof, fullyQualifiedName!F));
         }
 
@@ -87,7 +85,7 @@ template wrapper(alias F)
         else
         {
             auto ret = F(args.expand);
-            return ret.serializeToUniNode!RT;
+            return ret.serialize!RT;
         }
     }
 }
