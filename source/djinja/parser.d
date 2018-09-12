@@ -149,11 +149,12 @@ private:
 
         switch(front.value) with (Keyword)
         {
-            case If:    return parseIf();
-            case For:   return parseFor();
-            case Set:   return parseSet();
-            case Macro: return parseMacro();
-            case Call:  return parseCall();
+            case If:     return parseIf();
+            case For:    return parseFor();
+            case Set:    return parseSet();
+            case Macro:  return parseMacro();
+            case Call:   return parseCall();
+            case Filter: return parseFilterBlock();
             default:
                 assert(0, "Not implemented kw %s".fmt(front.value));
         }
@@ -355,6 +356,23 @@ private:
         return new CallNode(macroName, formalArgs, factArgs, block);
     }
 
+    FilterBlockNode parseFilterBlock()
+    {
+        pop(Keyword.Filter);
+
+        auto filterName = front.value;
+        auto args = parseCallExpr();
+
+        pop(Type.StmtEnd);
+
+        auto block = parseStatementBlock();
+
+        pop(Type.StmtBegin);
+        pop(Keyword.EndFilter);
+        pop(Type.StmtEnd);
+
+        return new FilterBlockNode(filterName, args, block);
+    }
     
     Arg[] parseFormalArgs()
     {
@@ -919,6 +937,8 @@ bool isBeginingKeyword(Keyword kw)
                 Keyword.Extends,
                 Keyword.Macro,
                 Keyword.Call,
+                Keyword.Filter,
+                Keyword.With,
                 Keyword.Include,
                 Keyword.Import
         );

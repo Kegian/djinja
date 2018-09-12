@@ -12,7 +12,8 @@ immutable(UniNode function(UniNode))[string] globalFilters()
     return cast(immutable)
         [
             "default": &wrapper!defaultVal,
-            "d": &wrapper!defaultVal,
+            "d":       &wrapper!defaultVal,
+            "upper":   &wrapper!upper,
         ];
 }
 
@@ -34,4 +35,11 @@ UniNode defaultVal(UniNode value, UniNode default_value = UniNode(null), bool bo
         return default_value;
 
     return value;
+}
+
+
+string upper(string str)
+{
+    import std.uni : toUpper;
+    return str.toUpper;
 }

@@ -344,6 +344,31 @@ class Printer : NullVisitor
     }
 
 
+    override void visit(FilterBlockNode node)
+    {
+        print("Filter: '%s'".fmt(node.filterName));
+
+        _tab++;
+
+        if (node.args.isNull)
+            print("Args: NONE");
+        else
+        {
+            print("Args:");
+            _tab++;
+            node.args.accept(this);
+            _tab--;
+        }
+
+        print("Body:");
+        _tab++;
+        node.block.accept(this);
+        _tab--;
+
+        _tab--;
+    }
+
+
     void print(string str)
     {
         foreach(i; 0 .. _tab)

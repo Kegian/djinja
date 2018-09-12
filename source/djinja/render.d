@@ -161,15 +161,22 @@ class Context
 }
 
 
+struct AppliedFilter
+{
+    string name;
+    UniNode args;
+}
+
 
 class Render(T) : IVisitor
 {
     private
     {
         T _parser;
-        Context _context;
-        UniNode[] _stack;
-        string _result;
+        Context         _context;
+        UniNode[]       _dataStack;
+        string          _renderedResult;
+        AppliedFilter[] _appliedFilters;
     }
 
     this(T parser)
@@ -191,10 +198,10 @@ class Render(T) : IVisitor
         foreach(key, value; globalTests)
             _context.functions[key] = cast(Function)value;
 
-        _result = "";
+        _renderedResult = "";
         if (_parser.root !is null)
             _parser.root.accept(this);
-        return _result;
+        return _renderedResult;
     }
 
     uint _tab = 0;
@@ -209,7 +216,7 @@ class Render(T) : IVisitor
 
     override void visit(RawNode node)
     {
-        _result ~= node.raw;
+        writeToResult(node.raw);
     }
 
     override void visit(ExprNode node)
@@ -217,7 +224,7 @@ class Render(T) : IVisitor
         node.expr.accept(this);
         auto n = pop();
         n.toStringType;
-        _result ~= n.get!string;
+        writeToResult(n.get!string);
     }
 
     override void visit(InlineIfNode node)
@@ -688,6 +695,17 @@ class Render(T) : IVisitor
     }
 
 
+    override void visit(FilterBlockNode node)
+    {
+        node.args.accept(this);
+        auto args = pop();
+
+        pushFilter(node.filterName, args);
+        node.block.accept(this);
+        popFilter();
+    }
+
+
 private:
 
     UniNode visitFunc(string name, UniNode args)
@@ -750,6 +768,37 @@ private:
     }
 
 
+    void writeToResult(string str)
+    {
+        if (!_appliedFilters.length)
+        {
+            _renderedResult ~= str;
+        }
+        else
+        {
+            UniNode curr = UniNode(str); 
+
+
+            foreach_reverse (filter; _appliedFilters)
+            {
+                auto args = filter.args;
+                args["varargs"] = UniNode([curr] ~ args["varargs"].get!(UniNode[]));
+
+                if (_context.hasFunc(filter.name))
+                    curr = visitFunc(filter.name, args);
+                else if (_context.hasMacro(filter.name))
+                    curr = visitMacro(filter.name, args);
+                else
+                    assert(0);
+
+                curr.toStringType;
+            }
+
+            _renderedResult ~= curr.get!string;
+        }
+    }
+
+
 private:
 
 
@@ -767,18 +816,28 @@ private:
     
     void push(UniNode un)
     {
-        _stack ~= un;
+        _dataStack ~= un;
     }
 
 
     UniNode pop()
     {
-        if (!_stack.length)
+        if (!_dataStack.length)
             throw new JinjaRenderException("Unexpected empty stack");
 
-        auto un = _stack.back;
-        _stack.popBack;
+        auto un = _dataStack.back;
+        _dataStack.popBack;
         return un;
+    }
+
+    void pushFilter(string name, UniNode args)
+    {
+        _appliedFilters ~= AppliedFilter(name, args);
+    }
+
+    void popFilter()
+    {
+        _appliedFilters.popBack;
     }
 }
 

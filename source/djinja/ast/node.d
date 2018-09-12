@@ -33,6 +33,7 @@ alias NodeTypes = AliasSeq!(
         MacroNode,
         CallNode,
         InlineIfNode,
+        FilterBlockNode,
     );
 
 
@@ -351,6 +352,23 @@ class CallNode : Node
         this.macroName = macroName;
         this.formArgs = formArgs;
         this.factArgs = factArgs.toNullable;
+        this.block = block.toNullable;
+    }
+
+    mixin AcceptVisitor;
+}
+
+
+class FilterBlockNode : Node
+{
+    string filterName;
+    Nullable!Node args;
+    Nullable!Node block;
+
+    this(string filterName, Node args, Node block)
+    {
+        this.filterName = filterName;
+        this.args = args.toNullable;
         this.block = block.toNullable;
     }
 

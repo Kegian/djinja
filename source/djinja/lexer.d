@@ -64,6 +64,8 @@ enum Keyword : string
     EndCall = "endcall",
     Filter = "filter",
     EndFilter = "endfilter",
+    With = "with",
+    EndWith = "endwith",
     Set = "set",
     EndSet = "endset",
     Include = "include",
