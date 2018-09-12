@@ -484,21 +484,37 @@ private:
 
     /**
       * Parse compare expression:
-      * cmp = concatexpr (CMPOP concatexpr)?
+      * cmp = filterexpr (CMPOP filterexpr)?
       */
     Node parseCmpExpr()
     {
-        auto lhs = parseConcatExpr();
+        auto lhs = parseFilterExpr();
 
         if (front.type == Type.Operator && front.value.toOperator.isCmpOperator)
-            return new BinOpNode(pop.value, lhs, parseConcatExpr);
+            return new BinOpNode(pop.value, lhs, parseFilterExpr);
 
         return lhs;
     }
 
     /**
+      * filterexpr = concatexpr (FILTER callexpr)*
+      */
+    Node parseFilterExpr()
+    {
+        auto filterexpr = parseConcatExpr();
+
+        while (front == Operator.Filter)
+        {
+            pop(Operator.Filter);
+            filterexpr = new BinOpNode(Operator.Filter, filterexpr, parseCallExpr());
+        }
+
+        return filterexpr;
+    }
+
+    /**
       * Parse expression:
-      * concatexpr = mathexpr((CONCAT)concatexpr)?
+      * concatexpr = mathexpr (CONCAT concatexpr)?
       */
     Node parseConcatExpr()
     {

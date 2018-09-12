@@ -101,7 +101,7 @@ class Context
         if (name in data)
             return data[name];
         if (prev is null)
-            throw new JinjaRenderException("Non declared var `%s`".fmt(name));
+            return UniNode(null);
         return prev.get(name);
     }
 
@@ -244,32 +244,47 @@ class Render(T) : IVisitor
 
     override void visit(BinOpNode node)
     {
-
-        UniNode lhs, rhs, res;
-
         UniNode calc(Operator op)()
         {
             node.lhs.accept(this);
-            lhs = pop();
+            auto lhs = pop();
 
             node.rhs.accept(this);
-            rhs = pop();
+            auto rhs = pop();
 
             return binary!op(lhs, rhs);
         }
 
-        UniNode calcLogical(bool stopCondition)()
+        UniNode calcLogic(bool stopCondition)()
         {
             node.lhs.accept(this);
-            lhs = pop();
+            auto lhs = pop();
             lhs.toBoolType;
             if (lhs.get!bool == stopCondition)
                 return UniNode(stopCondition);
 
             node.rhs.accept(this);
-            rhs = pop();
+            auto rhs = pop();
             rhs.toBoolType;
             return UniNode(rhs.get!bool);
+        }
+
+        UniNode calcFilter()
+        {
+            node.lhs.accept(this);
+            auto lhs = pop();
+
+            node.rhs.accept(this);
+            auto args = pop();
+            auto name = args["name"].get!string;
+            args["varargs"] = UniNode([lhs] ~ args["varargs"].get!(UniNode[]));
+            
+            if (_context.hasFunc(name))
+                return visitFunc(name, args);
+            else if (_context.hasMacro(name))
+                return visitMacro(name, args);
+            else
+                throw new JinjaRenderException("Undefined filter %s".fmt(name));
         }
 
         UniNode doSwitch()
@@ -291,8 +306,12 @@ class Render(T) : IVisitor
                 case NotEq:     return calc!NotEq;
                 case Pow:       return calc!Pow;
                 case In:        return calc!In;
-                case Or:        return calcLogical!true;
-                case And:       return calcLogical!false;
+
+                case Or:        return calcLogic!true;
+                case And:       return calcLogic!false;
+
+                case Filter:    return calcFilter;
+
                 default:
                     assert(0, "Not implemented binary operator");
             }
@@ -405,8 +424,6 @@ class Render(T) : IVisitor
                         throw new JinjaRenderException("Not found any macro, function or filter `%s`".fmt(name));
                     break;
 
-                case nil:
-                    break;
                 default:
                     throw new JinjaRenderException("Unknown attribute %s for %s".fmt(key.toString, node.name));
             }
