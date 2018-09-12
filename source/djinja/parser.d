@@ -113,7 +113,9 @@ private:
             switch(front.type) with (Type)
             {
                 case Raw:
-                    block.children ~= new RawNode(pop.value);
+                    auto raw = pop.value;
+                    if (raw.length)
+                        block.children ~= new RawNode(raw);
                     break;
 
                 case ExprBegin:
@@ -389,7 +391,7 @@ private:
     /**
       * inlineif = orexpr (IF orexpr (ELSE orexpr)? )?
       */
-    InlineIfNode parseInlineIf()
+    Node parseInlineIf()
     {
         Node expr;
         Node cond = null;
@@ -407,9 +409,11 @@ private:
                 pop(Keyword.Else);
                 other = parseOrExpr();
             }
+
+            return new InlineIfNode(expr, cond, other);
         }
 
-        return new InlineIfNode(expr, cond, other);
+        return expr;
     }
 
     /**

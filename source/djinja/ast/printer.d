@@ -57,7 +57,7 @@ class Printer : NullVisitor
 
     override void visit(InlineIfNode node)
     {
-        print("InlineIf block:");
+        print("Inline If:");
 
         _tab++;
 
@@ -71,8 +71,13 @@ class Printer : NullVisitor
             _tab--;
         }
         
+        print("Expression:");
+        _tab++;
+        node.expr.accept(this);
+        _tab--;
+
         if (node.other.isNull)
-            print("Else: NONE");
+            print("Else: nil");
         else
         {
             print("Else:");
@@ -80,11 +85,6 @@ class Printer : NullVisitor
             node.other.accept(this);
             _tab--;
         }
-
-        print("Expression:");
-        _tab++;
-        node.expr.accept(this);
-        _tab--;
 
         _tab--;
     }

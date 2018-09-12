@@ -47,6 +47,7 @@ void assertJinja(E : JinjaException)(bool expr, string msg = "", string file = _
 }
 
 
+alias assertJinjaException = assertJinja!JinjaException;
 alias assertJinjaLexer = assertJinja!JinjaLexerException;
 alias assertJinjaParser = assertJinja!JinjaParserException;
 alias assertJinjaRender = assertJinja!JinjaRenderException;
