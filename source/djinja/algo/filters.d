@@ -7,13 +7,13 @@ private
 }
 
 
-immutable(UniNode function(UniNode))[string] globalFilters()
+Function[string] globalFilters()
 {
     return cast(immutable)
         [
-            "default": &wrapper!defaultVal,
-            "d":       &wrapper!defaultVal,
-            "upper":   &wrapper!upper,
+            "default": wrapper!defaultVal,
+            "d":       wrapper!defaultVal,
+            "upper":   wrapper!upper,
         ];
 }
 

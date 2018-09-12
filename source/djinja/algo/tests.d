@@ -7,12 +7,13 @@ private
 }
 
 
-immutable(UniNode function(UniNode))[string] globalTests()
+Function[string] globalTests()
 {
     return cast(immutable)
         [
-            "defined": &wrapper!defined,
-            "undefined": &wrapper!undefined,
+            "defined":   wrapper!defined,
+            "undefined": wrapper!undefined,
+            "number":    wrapper!number,
         ];
 }
 
@@ -26,4 +27,9 @@ bool defined(UniNode value)
 bool undefined(UniNode value)
 {
     return value.kind == UniNode.Kind.nil;
+}
+
+bool number(UniNode value)
+{
+    return value.isNumericNode;
 }

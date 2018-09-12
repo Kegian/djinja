@@ -8,6 +8,7 @@ private
     import djinja.ast.node;
     import djinja.ast.visitor;
     import djinja.algo;
+    import djinja.algo.wrapper;
     import djinja.lexer;
     import djinja.parser;
     import djinja.exception : JinjaRenderException,
@@ -17,7 +18,6 @@ private
 }
 
 
-alias Function = UniNode function(UniNode);
 
 
 struct FormArg
@@ -603,50 +603,34 @@ class Render(T) : IVisitor
             return condition;
         }
 
-        void iterate(UniNode iterable) @safe
+        void loop(UniNode iterable) @safe
         {
-            if (node.key.length)
+            iterable.toIterableNode;
+            foreach(ref it; iterable)
             {
-                iterable.checkNodeType(UniNode.Kind.object);
-                foreach(idx, ref obj; iterable)
-                {
-                    () @trusted {
-                        if (node.isRecursive && obj.kind == UniNode.Kind.object)
-                            iterate(obj);
-                        else
-                        {
-                            _context.data[node.key] = UniNode(idx);
-                            _context.data[node.value] = obj;
-                            if (calcCondition())
-                            {
-                                // TODO UPDATE LOOP VARS
-                                node.block.accept(this);
-                                iterated = true;
-                            }
-                        }
-                    } ();
-                }
-            }
-            else
-            {
-                iterable.checkNodeType(UniNode.Kind.array);
-                foreach(ref it; iterable)
-                {
-                    () @trusted {
-                        if (node.isRecursive && it.kind == UniNode.Kind.array)
-                            iterate(it);
-                        else
-                        {
-                            _context.data[node.value] = it;
-                            if (calcCondition())
-                            {
-                                // TODO UPDATE LOOP VARS
-                                node.block.accept(this);
-                                iterated = true;
-                            }
-                        }
-                    } ();
-                }
+                () @trusted {
+                    if (node.isRecursive)
+                    {
+                        _context.functions["loop"] = wrapper!loop;
+                    }
+
+                    if (node.keys.length == 1)
+                        _context.data[node.keys[0]] = it;
+                    else
+                    {
+                        it.checkNodeType(UniNode.Kind.array);
+                        assertJinja(it.length >= node.keys.length, "Num of keys less then values");
+                        foreach(i, key; node.keys)
+                            _context.data[key] = it[i];
+                    }
+
+                    if (calcCondition())
+                    {
+                        // TODO UPDATE LOOP VARS
+                        node.block.accept(this);
+                        iterated = true;
+                    }
+                } ();
             }
         }
 
@@ -654,7 +638,7 @@ class Render(T) : IVisitor
 
         node.iterable.accept(this);
         UniNode iterable = pop();
-        iterate(iterable);
+        loop(iterable);
 
         popContext();
 

@@ -212,7 +212,13 @@ class Printer : NullVisitor
 
     override void visit(ForNode node)
     {
-        print("For: %s, %s".fmt(node.key, node.value));
+        print("For:");
+        _tab++;
+
+        print("Keys:");
+        _tab++;
+        foreach (key; node.keys)
+            print(key);
         _tab++;
 
         print("Iterable:");

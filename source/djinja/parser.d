@@ -164,18 +164,17 @@ private:
 
     ForNode parseFor()
     {
-        string key, value;
+        string[] keys;
         bool isRecursive = false;
         Node cond = null;
 
         pop(Keyword.For);
-        value = pop(Type.Ident).value;
 
-        if (front.type == Type.Comma)
+        keys ~= pop(Type.Ident).value;
+        while(front != Operator.In)
         {
             pop(Type.Comma);
-            key = value;
-            value = pop(Type.Ident).value;
+            keys ~= pop(Type.Ident).value;
         }
 
         pop(Operator.In);
@@ -213,7 +212,7 @@ private:
             case EndFor:
                 pop(Keyword.EndFor);
                 pop(Type.StmtEnd);
-                return new ForNode(key, value, iterable, block, null, cond, isRecursive);
+                return new ForNode(keys, iterable, block, null, cond, isRecursive);
             case Else:
                 pop(Keyword.Else);
                 pop(Type.StmtEnd);
@@ -221,7 +220,7 @@ private:
                 pop(Type.StmtBegin);
                 pop(Keyword.EndFor);
                 pop(Type.StmtEnd);
-                return new ForNode(key, value, iterable, block, other, cond, isRecursive);
+                return new ForNode(keys, iterable, block, other, cond, isRecursive);
             default:
                 throw new JinjaParserException("Unexpected token %s".fmt(front.value));
         }

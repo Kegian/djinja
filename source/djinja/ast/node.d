@@ -248,17 +248,16 @@ class IfNode : Node
 
 class ForNode : Node
 {
-    string key, value;
+    string[] keys;
     Nullable!Node iterable;
     Nullable!Node block;
     Nullable!Node other;
     Nullable!Node cond;
     bool isRecursive;
 
-    this(string key, string value, Node iterable, Node block, Node other, Node cond, bool isRecursive)
+    this(string[] keys, Node iterable, Node block, Node other, Node cond, bool isRecursive)
     {
-        this.key = key;
-        this.value = value;
+        this.keys = keys;
         this.iterable = iterable.toNullable;
         this.block = block.toNullable;
         this.other = other.toNullable;

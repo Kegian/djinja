@@ -10,7 +10,8 @@ public
 
 private
 {
-    import std.algorithm : among;
+    import std.array : array;
+    import std.algorithm : among, map;
     import std.format: fmt = format;
     import std.conv : to;
 
@@ -49,8 +50,35 @@ bool isIterableNode(ref UniNode n)
 {
     return cast(bool)n.kind.among!(
             UniNode.Kind.array,
-            UniNode.Kind.object
+            UniNode.Kind.object,
+            UniNode.Kind.text
         );
+}
+
+void toIterableNode(ref UniNode n) @safe
+{
+    switch (n.kind) with (UniNode.Kind)
+    {
+        case array:
+            return;
+        case text:
+            () @trusted {
+                n = UniNode(n.get!string.map!(a => UniNode(cast(string)[a])).array);
+            } ();
+            return;
+        case object:
+            UniNode[] arr;
+            foreach (key, val; n.get!(UniNode[string]))
+            {
+                () @trusted {
+                    arr ~= UniNode([UniNode(key), val]);
+                } ();
+            }
+            n = UniNode(arr);
+            return;
+        default:
+            throw new JinjaRenderException("Can't implicity convert type %s to iterable".fmt(n.kind));
+    }
 }
 
 void toCommonNumType(ref UniNode n1, ref UniNode n2)

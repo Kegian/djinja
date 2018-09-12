@@ -5,16 +5,18 @@ private
     import djinja.algo.wrapper;
     import djinja.exception : assertJinja = assertJinjaException;
     import djinja.uninode;
+
+    import std.functional : toDelegate;
 }
 
 
-immutable(UniNode function(UniNode))[string] globalFunctions()
+Function[string] globalFunctions()
 {
     return cast(immutable)
         [
-            "range": &range,
-            "length": &length,
-            "myRange": &wrapper!myRange,
+            "range": toDelegate(&range),
+            "length": toDelegate(&length),
+            "myRange": wrapper!myRange,
         ];
 }
 
