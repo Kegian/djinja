@@ -155,11 +155,10 @@ private:
             case Macro:  return parseMacro();
             case Call:   return parseCall();
             case Filter: return parseFilterBlock();
+            case With:   return parseWith();
             default:
                 assert(0, "Not implemented kw %s".fmt(front.value));
         }
-
-        // return new RawNode("I must be statemnet");
     }
 
 
@@ -356,6 +355,7 @@ private:
         return new CallNode(macroName, formalArgs, factArgs, block);
     }
 
+
     FilterBlockNode parseFilterBlock()
     {
         pop(Keyword.Filter);
@@ -374,6 +374,22 @@ private:
         return new FilterBlockNode(filterName, args, block);
     }
     
+
+    StmtBlockNode parseWith()
+    {
+        pop(Keyword.With);
+        pop(Type.StmtEnd);
+
+        auto block = parseStatementBlock();
+
+        pop(Type.StmtBegin);
+        pop(Keyword.EndWith);
+        pop(Type.StmtEnd);
+
+        return block;
+    }
+
+
     Arg[] parseFormalArgs()
     {
         Arg[] args = [];
