@@ -751,11 +751,11 @@ class Render : IVisitor
         if (!node.withContext)
             _context = stashedContext;
 
-        if (node.macros.length)
-            foreach (key; node.macros)
+        if (node.macrosNames.length)
+            foreach (name; node.macrosNames)
             {
-                assertJinja(cast(bool)(key in macros), "Undefined macro `%s` in `%s`".fmt(key, node.fileName));
-                _context.macros[key] = macros[key];
+                assertJinja(cast(bool)(name.was in macros), "Undefined macro `%s` in `%s`".fmt(name.was, node.fileName));
+                _context.macros[name.become] = macros[name.was];
             }
         else
             foreach (key, val; macros)

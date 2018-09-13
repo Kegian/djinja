@@ -435,10 +435,11 @@ private:
     {
         pop(Keyword.Import);
         auto path = pop(Type.String).value.absolute;
-        bool withContext = true;
+        bool withContext = false;
 
         if (front == Keyword.With)
         {
+            withContext = true;
             pop(Keyword.With);
             pop(Keyword.Context);
         }
@@ -456,7 +457,7 @@ private:
         
         auto stmtBlock = parseTreeFromFile(path);
         
-        return new ImportNode(path, cast(string[])[], stmtBlock, withContext);
+        return new ImportNode(path, cast(ImportNode.Rename[])[], stmtBlock, withContext);
     }
 
 
@@ -466,18 +467,33 @@ private:
         auto path = pop(Type.String).value.absolute;
         pop(Keyword.Import);
 
-        string[] macros = [pop(Type.Ident).value];
+        ImportNode.Rename[] macros;
 
-        while (front == Type.Comma)
+        bool firstName = true;
+        while (front == Type.Comma || firstName)
         {
-            pop(Type.Comma);
-            macros ~= pop(Type.Ident).value;
+            if (!firstName)
+                pop(Type.Comma);
+
+            auto was = pop(Type.Ident).value;
+            auto become = was;
+
+            if (front == Keyword.As)
+            {
+                pop(Keyword.As);
+                become = pop(Type.Ident).value;
+            }
+
+            macros ~= ImportNode.Rename(was, become);
+
+            firstName = false;
         }
 
-        bool withContext = true;
+        bool withContext = false;
 
         if (front == Keyword.With)
         {
+            withContext = true;
             pop(Keyword.With);
             pop(Keyword.Context);
         }

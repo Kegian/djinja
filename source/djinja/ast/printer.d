@@ -394,14 +394,14 @@ class Printer : NullVisitor
 
         _tab++;
 
-        if (!node.macros.length)
+        if (!node.macrosNames.length)
             print("Macros: all");
         else
         {
             print("Macros:");
             _tab++;
-            foreach(name; node.macros)
-                print(name);
+            foreach(name; node.macrosNames)
+                print("%s -> %s".fmt(name.was, name.become));
             _tab--;
         }
 

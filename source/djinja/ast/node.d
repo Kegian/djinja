@@ -382,15 +382,20 @@ class FilterBlockNode : Node
 
 class ImportNode : Node
 {
+    struct Rename
+    {
+        string was, become;
+    }
+
     string fileName;
-    string[] macros;
+    Rename[] macrosNames;
     Nullable!StmtBlockNode stmtBlock;
     bool withContext;
 
-    this(string fileName, string[] macros, StmtBlockNode stmtBlock, bool withContext)
+    this(string fileName, Rename[] macrosNames, StmtBlockNode stmtBlock, bool withContext)
     {
         this.fileName = fileName;
-        this.macros = macros;
+        this.macrosNames = macrosNames;
         this.stmtBlock = stmtBlock.toNullable;
         this.withContext = withContext;
     }

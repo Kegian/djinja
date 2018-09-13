@@ -72,6 +72,7 @@ enum Keyword : string
     Include = "include",
     Import = "import",
     From = "from",
+    As = "as",
     Without = "without",
     Context = "context",
 }
