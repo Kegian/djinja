@@ -388,6 +388,37 @@ class Printer : NullVisitor
     }
 
 
+    override void visit(ImportNode node)
+    {
+        print("Import: '%s'".fmt(node.fileName));
+
+        _tab++;
+
+        if (!node.macros.length)
+            print("Macros: all");
+        else
+        {
+            print("Macros:");
+            _tab++;
+            foreach(name; node.macros)
+                print(name);
+            _tab--;
+        }
+
+        if (node.stmtBlock.isNull)
+            print("Block: Missing");
+        else
+            print("Block: %s children".fmt(node.stmtBlock.children.length));
+
+        if (node.withContext)
+            print("Context: with");
+        else
+            print("Context: without");
+
+        _tab--;
+    }
+
+
     void print(string str)
     {
         foreach(i; 0 .. _tab)

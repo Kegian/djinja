@@ -71,6 +71,29 @@ enum Keyword : string
     EndSet = "endset",
     Include = "include",
     Import = "import",
+    From = "from",
+    Without = "without",
+    Context = "context",
+}
+
+bool isBeginingKeyword(Keyword kw)
+{
+    import std.algorithm : among;
+
+    return cast(bool)kw.among(
+                Keyword.If,
+                Keyword.Set,
+                Keyword.For,
+                Keyword.Block,
+                Keyword.Extends,
+                Keyword.Macro,
+                Keyword.Call,
+                Keyword.Filter,
+                Keyword.With,
+                Keyword.Include,
+                Keyword.Import,
+                Keyword.From
+        );
 }
 
 Keyword toKeyword(string key)

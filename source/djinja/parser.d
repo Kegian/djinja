@@ -2,6 +2,7 @@ module djinja.parser;
 
 private
 {
+    import std.file : exists, read;
     import std.format: fmt = format;
     import std.conv : to;
 
@@ -16,37 +17,22 @@ struct Parser(Lexer)
 {
     private
     {
-        Node _root;
-        Lexer _lexer;
-        Token[] tokens_;
-
-        Token _curr;
-        bool _read;
+        StmtBlockNode[string] _parsedFiles;
+        Token[] _tokens;
     }
 
-    this(Lexer lexer)
-    {
-        //TODO appender
-        while (true)
-        {
-            auto tkn = lexer.nextToken;
-            tokens_ ~= tkn; 
-            if (tkn.type == Type.EOF)
-                break;
-        }
-    }
 
     void preprocess()
     {
         import std.uni : isWhite;
 
         // Cutting newline and whitespaces before/after statements
-        for(int i = 1; i < tokens_.length - 1; i++)
+        for(int i = 1; i < _tokens.length - 1; i++)
         {
-            if (tokens_[i].type == Type.StmtBegin
-                && tokens_[i-1].type == Type.Raw)
+            if (_tokens[i].type == Type.StmtBegin
+                && _tokens[i-1].type == Type.Raw)
             {
-                auto str = tokens_[i-1].value;
+                auto str = _tokens[i-1].value;
                 auto idx = str.length;
                 for (long j = cast(long)str.length - 1; j >= 0; j--)
                 {
@@ -55,12 +41,12 @@ struct Parser(Lexer)
                     if (isWhite(str[j]))
                         idx = j;
                 }
-                tokens_[i-1].value = idx > 0 ? str[0 .. idx] : "";
+                _tokens[i-1].value = idx > 0 ? str[0 .. idx] : "";
             }
-            else if (tokens_[i].type == Type.StmtEnd
-                && tokens_[i+1].type == Type.Raw)
+            else if (_tokens[i].type == Type.StmtEnd
+                && _tokens[i+1].type == Type.Raw)
             {
-                auto str = tokens_[i+1].value;
+                auto str = _tokens[i+1].value;
                 auto idx = 0;
                 for (auto j = 0; j < str.length; j++)
                 {
@@ -69,23 +55,61 @@ struct Parser(Lexer)
                     if (str[j] == '\n')
                         break;
                 }
-                tokens_[i+1].value = idx < str.length ? str[idx .. $] : "";
+                _tokens[i+1].value = idx < str.length ? str[idx .. $] : "";
             }
         }
     }
 
-    void parseTree()
+
+    StmtBlockNode parseTree(string str)
     {
+        auto lexer = Lexer(str);
+
+        auto stashedTokens = _tokens;
+        _tokens = [];
+
+        //TODO appender
+        while (true)
+        {
+            auto tkn = lexer.nextToken;
+            _tokens ~= tkn; 
+            if (tkn.type == Type.EOF)
+                break;
+        }
+
         preprocess();
-        _root = parseStatementBlock();
+
+        auto root = parseStatementBlock();
+
         if (front.type != Type.EOF)
-            throw new JinjaParserException("Expected EOF found %s".fmt(front.value));
+            throw new JinjaParserException("Expected EOF found %s(%s)".fmt(front.type, front.value));
+
+        _tokens = stashedTokens;
+
+        return root;
     }
 
-    Node root()
+
+    StmtBlockNode parseTreeFromFile(string path)
     {
-        return _root;
+        path = path.absolute;
+
+        if (auto cached = path in _parsedFiles)
+        {
+            if (*cached is null)
+                throw new JinjaParserException("Recursive imports not allowed");
+            else
+                return *cached;
+        }
+
+        // Prevent recursive imports
+        _parsedFiles[path] = null;
+        auto str = cast(string)read(path);
+        _parsedFiles[path] = parseTree(str);
+
+        return _parsedFiles[path];
     }
+
 
 private: 
 
@@ -135,6 +159,8 @@ private:
                     break;
 
                 default:
+                    import std.stdio: wl = writeln;
+                    wl("???? ", front);
                     return block;
             }
         }
@@ -156,6 +182,8 @@ private:
             case Call:   return parseCall();
             case Filter: return parseFilterBlock();
             case With:   return parseWith();
+            case Import: return parseImport();
+            case From:   return parseImportFrom();
             default:
                 assert(0, "Not implemented kw %s".fmt(front.value));
         }
@@ -400,6 +428,74 @@ private:
         pop(Type.StmtEnd);
 
         return block;
+    }
+
+
+    ImportNode parseImport()
+    {
+        pop(Keyword.Import);
+        auto path = pop(Type.String).value.absolute;
+        bool withContext = true;
+
+        if (front == Keyword.With)
+        {
+            pop(Keyword.With);
+            pop(Keyword.Context);
+        }
+
+        if (front == Keyword.Without)
+        {
+            withContext = false;
+            pop(Keyword.Without);
+            pop(Keyword.Context);
+        }
+
+        pop(Type.StmtEnd);
+
+        assertJinja(path.exists, "Non existing file `%s`".fmt(path));
+        
+        auto stmtBlock = parseTreeFromFile(path);
+        
+        return new ImportNode(path, cast(string[])[], stmtBlock, withContext);
+    }
+
+
+    ImportNode parseImportFrom()
+    {
+        pop(Keyword.From);
+        auto path = pop(Type.String).value.absolute;
+        pop(Keyword.Import);
+
+        string[] macros = [pop(Type.Ident).value];
+
+        while (front == Type.Comma)
+        {
+            pop(Type.Comma);
+            macros ~= pop(Type.Ident).value;
+        }
+
+        bool withContext = true;
+
+        if (front == Keyword.With)
+        {
+            pop(Keyword.With);
+            pop(Keyword.Context);
+        }
+
+        if (front == Keyword.Without)
+        {
+            withContext = false;
+            pop(Keyword.Without);
+            pop(Keyword.Context);
+        }
+
+        pop(Type.StmtEnd);
+
+        assertJinja(path.exists, "Non existing file `%s`".fmt(path));
+        
+        auto stmtBlock = parseTreeFromFile(path);
+        
+        return new ImportNode(path, macros, stmtBlock, withContext);
     }
 
 
@@ -906,15 +1002,15 @@ private:
 
     Token front()
     {
-        if (tokens_.length)
-            return tokens_[0];
+        if (_tokens.length)
+            return _tokens[0];
         return Token(Type.EOF);
     }
 
     Token next()
     {
-        if (tokens_.length > 1)
-            return tokens_[1];
+        if (_tokens.length > 1)
+            return _tokens[1];
         return Token(Type.EOF);
     }
 
@@ -922,8 +1018,8 @@ private:
     Token pop()
     {
         auto tkn = front();
-        if (tokens_.length)
-            tokens_ = tokens_[1 .. $];
+        if (_tokens.length)
+            _tokens = _tokens[1 .. $];
         return tkn;
     }
 
@@ -952,23 +1048,12 @@ private:
     }
 }
 
+
 private:
 
-bool isBeginingKeyword(Keyword kw)
-{
-    import std.algorithm : among;
 
-    return cast(bool)kw.among(
-                Keyword.If,
-                Keyword.Set,
-                Keyword.For,
-                Keyword.Block,
-                Keyword.Extends,
-                Keyword.Macro,
-                Keyword.Call,
-                Keyword.Filter,
-                Keyword.With,
-                Keyword.Include,
-                Keyword.Import
-        );
+string absolute(string path)
+{
+    //TODO
+    return path;
 }

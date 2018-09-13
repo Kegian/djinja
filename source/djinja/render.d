@@ -168,21 +168,21 @@ struct AppliedFilter
 }
 
 
-class Render(T) : IVisitor
+class Render : IVisitor
 {
     private
     {
-        T _parser;
+        Node            _root;
         Context         _context;
+        Context         _globalContext;
         UniNode[]       _dataStack;
         string          _renderedResult;
         AppliedFilter[] _appliedFilters;
     }
 
-    this(T parser)
+    this(Node root)
     {
-        _parser = parser;
-        _parser.parseTree();
+        _root = root;
         _context = new Context();
     }
 
@@ -190,6 +190,7 @@ class Render(T) : IVisitor
     string render(UniNode data)
     {
         _context = new Context(data);
+        _globalContext = _context;
 
         foreach(key, value; globalFunctions)
             _context.functions[key] = cast(Function)value;
@@ -199,12 +200,11 @@ class Render(T) : IVisitor
             _context.functions[key] = cast(Function)value;
 
         _renderedResult = "";
-        if (_parser.root !is null)
-            _parser.root.accept(this);
+        if (_root !is null)
+            _root.accept(this);
         return _renderedResult;
     }
 
-    uint _tab = 0;
 
     override void visit(StmtBlockNode node)
     {
@@ -721,6 +721,45 @@ class Render(T) : IVisitor
         pushFilter(node.filterName, args);
         node.block.accept(this);
         popFilter();
+    }
+
+
+    override void visit(ImportNode node)
+    {
+        if (node.stmtBlock.isNull)
+            return;
+
+        auto stashedContext = _context;
+        auto stashedResult = _renderedResult;
+
+        if (!node.withContext)
+            _context = _globalContext;
+
+        _renderedResult = "";
+
+        pushNewContext();
+
+        foreach (child; node.stmtBlock.children)
+            child.accept(this);
+
+        auto macros = _context.macros;
+
+        popContext();
+
+        _renderedResult = stashedResult;
+
+        if (!node.withContext)
+            _context = stashedContext;
+
+        if (node.macros.length)
+            foreach (key; node.macros)
+            {
+                assertJinja(cast(bool)(key in macros), "Undefined macro `%s` in `%s`".fmt(key, node.fileName));
+                _context.macros[key] = macros[key];
+            }
+        else
+            foreach (key, val; macros)
+                _context.macros[key] = val;
     }
 
 

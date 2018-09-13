@@ -34,6 +34,7 @@ alias NodeTypes = AliasSeq!(
         CallNode,
         InlineIfNode,
         FilterBlockNode,
+        ImportNode,
     );
 
 
@@ -372,6 +373,26 @@ class FilterBlockNode : Node
         this.filterName = filterName;
         this.args = args.toNullable;
         this.block = block.toNullable;
+    }
+
+    mixin AcceptVisitor;
+}
+
+
+
+class ImportNode : Node
+{
+    string fileName;
+    string[] macros;
+    Nullable!StmtBlockNode stmtBlock;
+    bool withContext;
+
+    this(string fileName, string[] macros, StmtBlockNode stmtBlock, bool withContext)
+    {
+        this.fileName = fileName;
+        this.macros = macros;
+        this.stmtBlock = stmtBlock.toNullable;
+        this.withContext = withContext;
     }
 
     mixin AcceptVisitor;
