@@ -419,6 +419,26 @@ class Printer : NullVisitor
     }
 
 
+    override void visit(IncludeNode node)
+    {
+        print("Include: '%s'".fmt(node.fileName));
+
+        _tab++;
+
+        if (node.stmtBlock.isNull)
+            print("Block: Missing");
+        else
+            print("Block: %s children".fmt(node.stmtBlock.children.length));
+
+        if (node.withContext)
+            print("Context: with");
+        else
+            print("Context: without");
+
+        _tab--;
+    }
+
+
     void print(string str)
     {
         foreach(i; 0 .. _tab)

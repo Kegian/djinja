@@ -175,15 +175,16 @@ private:
 
         switch(front.value) with (Keyword)
         {
-            case If:     return parseIf();
-            case For:    return parseFor();
-            case Set:    return parseSet();
-            case Macro:  return parseMacro();
-            case Call:   return parseCall();
-            case Filter: return parseFilterBlock();
-            case With:   return parseWith();
-            case Import: return parseImport();
-            case From:   return parseImportFrom();
+            case If:      return parseIf();
+            case For:     return parseFor();
+            case Set:     return parseSet();
+            case Macro:   return parseMacro();
+            case Call:    return parseCall();
+            case Filter:  return parseFilterBlock();
+            case With:    return parseWith();
+            case Import:  return parseImport();
+            case From:    return parseImportFrom();
+            case Include: return parseInclude();
             default:
                 assert(0, "Not implemented kw %s".fmt(front.value));
         }
@@ -512,6 +513,66 @@ private:
         auto stmtBlock = parseTreeFromFile(path);
         
         return new ImportNode(path, macros, stmtBlock, withContext);
+    }
+
+
+    IncludeNode parseInclude()
+    {
+        import std.stdio: wl = writeln;
+        pop(Keyword.Include);
+
+        string[] names;
+
+        if (front == Type.LSParen)
+        {
+            pop(Type.LSParen);
+
+            names ~= pop(Type.String).value;
+            while (front == Type.Comma)
+            {
+                pop(Type.Comma);
+                names ~= pop(Type.String).value;
+            }
+
+            pop(Type.RSParen);
+        }
+        else
+            names ~= pop(Type.String).value;
+
+
+        bool ignoreMissing = false;
+        if (front == Keyword.Ignore)
+        {
+            pop(Keyword.Ignore);
+            pop(Keyword.Missing);
+            ignoreMissing = true;
+        }
+
+        bool withContext = true;
+
+        if (front == Keyword.With)
+        {
+            withContext = true;
+            pop(Keyword.With);
+            pop(Keyword.Context);
+        }
+
+        if (front == Keyword.Without)
+        {
+            withContext = false;
+            pop(Keyword.Without);
+            pop(Keyword.Context);
+        }
+
+        pop(Type.StmtEnd);
+
+        foreach (name; names)
+            if (name.exists)
+                return new IncludeNode(name, parseTreeFromFile(name), withContext);
+ 
+        assertJinja(ignoreMissing, "No existing files `%s`".fmt(names));
+        
+        return new IncludeNode("", null, withContext);
     }
 
 

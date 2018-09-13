@@ -35,6 +35,7 @@ alias NodeTypes = AliasSeq!(
         InlineIfNode,
         FilterBlockNode,
         ImportNode,
+        IncludeNode,
     );
 
 
@@ -396,6 +397,24 @@ class ImportNode : Node
     {
         this.fileName = fileName;
         this.macrosNames = macrosNames;
+        this.stmtBlock = stmtBlock.toNullable;
+        this.withContext = withContext;
+    }
+
+    mixin AcceptVisitor;
+}
+
+
+
+class IncludeNode : Node
+{
+    string fileName;
+    Nullable!StmtBlockNode stmtBlock;
+    bool withContext;
+
+    this(string fileName, StmtBlockNode stmtBlock, bool withContext)
+    {
+        this.fileName = fileName;
         this.stmtBlock = stmtBlock.toNullable;
         this.withContext = withContext;
     }

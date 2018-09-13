@@ -763,6 +763,23 @@ class Render : IVisitor
     }
 
 
+    override void visit(IncludeNode node)
+    {
+        if (node.stmtBlock.isNull)
+            return;
+
+        auto stashedContext = _context;
+
+        if (!node.withContext)
+            _context = _globalContext;
+
+        node.stmtBlock.accept(this);
+
+        if (!node.withContext)
+            _context = stashedContext;
+    }
+
+
 private:
 
     UniNode visitFunc(string name, UniNode args)

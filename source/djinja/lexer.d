@@ -69,12 +69,14 @@ enum Keyword : string
     EndWith = "endwith",
     Set = "set",
     EndSet = "endset",
-    Include = "include",
+    Ignore = "ignore",
+    Missing = "missing",
     Import = "import",
     From = "from",
     As = "as",
     Without = "without",
     Context = "context",
+    Include = "include",
 }
 
 bool isBeginingKeyword(Keyword kw)
@@ -93,7 +95,7 @@ bool isBeginingKeyword(Keyword kw)
                 Keyword.With,
                 Keyword.Include,
                 Keyword.Import,
-                Keyword.From
+                Keyword.From,
         );
 }
 
@@ -302,6 +304,12 @@ struct Lexer(
             return Token(Type.CmntEnd, cmntOpEnd);
         }
 
+        // Trying to read 'include' kw before 'in' op
+        if (cast(string)Keyword.Include == front(Keyword.Include.length))
+        {
+            skip(Keyword.Include.length);
+            return Token(Type.Keyword, Keyword.Include);
+        }
 
         // Trying to read operators
         static foreach(op; EnumMembers!Operator)
