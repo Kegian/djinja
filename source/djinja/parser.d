@@ -2,9 +2,11 @@ module djinja.parser;
 
 private
 {
+    import std.array : appender;
+    import std.conv : to;
     import std.file : exists, read;
     import std.format: fmt = format;
-    import std.conv : to;
+    import std.range;
 
     import djinja.ast;
     import djinja.lexer;
@@ -15,58 +17,83 @@ private
 
 struct Parser(Lexer)
 {
+    struct ParserState
+    {
+        Token[] tokens;
+        BlockNode[string] blocks;
+    }
+
     private
     {
-        StmtBlockNode[string] _parsedFiles;
+        TemplateNode[string] _parsedFiles;
+
         Token[] _tokens;
+        BlockNode[string] _blocks;
+
+        ParserState[] _states;
     }
 
 
     void preprocess()
     {
-        import std.uni : isWhite;
+        import std.string : stripRight, stripLeft;
 
-        // Cutting newline and whitespaces before/after statements
-        for(int i = 1; i < _tokens.length - 1; i++)
+        auto newTokens = appender!(Token[]);
+
+        for (int i = 0; i < _tokens.length;)
         {
-            if (_tokens[i].type == Type.StmtBegin
-                && _tokens[i-1].type == Type.Raw)
+            if (i < _tokens.length - 1
+                && _tokens[i] == Type.StmtBegin
+                && _tokens[i+1] == Operator.Minus)
             {
-                auto str = _tokens[i-1].value;
-                auto idx = str.length;
-                for (long j = cast(long)str.length - 1; j >= 0; j--)
-                {
-                    if (str[j] == '\n')
-                        break;
-                    if (isWhite(str[j]))
-                        idx = j;
-                }
-                _tokens[i-1].value = idx > 0 ? str[0 .. idx] : "";
+                newTokens.put(_tokens[i]);
+                i += 2;
             }
-            else if (_tokens[i].type == Type.StmtEnd
-                && _tokens[i+1].type == Type.Raw)
+            else if(i < _tokens.length - 1
+                    && _tokens[i] == Operator.Minus
+                    && _tokens[i+1] == Type.StmtEnd)
             {
-                auto str = _tokens[i+1].value;
-                auto idx = 0;
-                for (auto j = 0; j < str.length; j++)
-                {
-                    if (isWhite(str[j]))
-                        idx = j + 1;
-                    if (str[j] == '\n')
-                        break;
-                }
-                _tokens[i+1].value = idx < str.length ? str[idx .. $] : "";
+                newTokens.put(_tokens[i+1]);
+                i += 2;
+            }
+            else if (_tokens[i] == Type.Raw)
+            {
+                bool stripR = false;
+                bool stripL = false;
+
+                if (i >= 2 
+                    && _tokens[i-2] == Operator.Minus
+                    && _tokens[i-1] == Type.StmtEnd
+                    )
+                    stripL = true;
+
+                if (i < _tokens.length - 2 
+                    && _tokens[i+1] == Type.StmtBegin
+                    && _tokens[i+2] == Operator.Minus
+                    )
+                    stripR = true;
+
+                auto str = _tokens[i].value;
+                str = stripR ? str.stripRight : str;
+                str = stripL ? str.stripLeft : str;
+                newTokens.put(Token(Type.Raw, str));
+                i++;
+            }
+            else
+            {
+                newTokens.put(_tokens[i]);
+                i++;
             }
         }
+        _tokens = newTokens.data;
     }
 
 
-    StmtBlockNode parseTree(string str)
+    TemplateNode parseTree(string str)
     {
         auto lexer = Lexer(str);
 
-        auto stashedTokens = _tokens;
-        _tokens = [];
+        stashState();
 
         //TODO appender
         while (true)
@@ -84,13 +111,14 @@ struct Parser(Lexer)
         if (front.type != Type.EOF)
             throw new JinjaParserException("Expected EOF found %s(%s)".fmt(front.type, front.value));
 
-        _tokens = stashedTokens;
+        auto blocks = _blocks;
+        popState();
 
-        return root;
+        return new TemplateNode(root, blocks);
     }
 
 
-    StmtBlockNode parseTreeFromFile(string path)
+    TemplateNode parseTreeFromFile(string path)
     {
         path = path.absolute;
 
@@ -185,6 +213,12 @@ private:
             case Import:  return parseImport();
             case From:    return parseImportFrom();
             case Include: return parseInclude();
+            case Extends: return parseExtends();
+
+            case Block:
+                auto block = parseBlock();
+                _blocks[block.name] = block;
+                return block;
             default:
                 assert(0, "Not implemented kw %s".fmt(front.value));
         }
@@ -575,6 +609,37 @@ private:
         return new IncludeNode("", null, withContext);
     }
 
+
+    ExtendsNode parseExtends()
+    {
+        pop(Keyword.Extends);
+        auto path = pop(Type.String).value.absolute;
+        pop(Type.StmtEnd);
+
+        assertJinja(path.exists, "Non existing file `%s`".fmt(path));
+        
+        auto stmtBlock = parseTreeFromFile(path);
+        
+        return new ExtendsNode(path, stmtBlock);
+    }
+
+
+    BlockNode parseBlock()
+    {
+        pop(Keyword.Block);
+        auto name = pop(Type.Ident).value;
+        pop(Type.StmtEnd);
+
+        auto stmt = parseStatementBlock();
+
+        pop(Type.StmtBegin);
+        pop(Keyword.EndBlock);
+        if (front == Type.Ident)
+            assertJinja(pop.value == name, "Missmatching block's begin/end names");
+        pop(Type.StmtEnd);
+
+        return new BlockNode(name, stmt);
+    }
 
     Arg[] parseFormalArgs()
     {
@@ -1122,6 +1187,28 @@ private:
         if (front.type != Type.Operator || front.value != op)
             throw new JinjaParserException("Unexpected token %s, expected op: %s".fmt(front.value, op));
         return pop();
+    }
+
+
+    void stashState()
+    {
+        ParserState old;
+        old.tokens = _tokens;
+        old.blocks = _blocks;
+        _states ~= old;
+        _tokens = [];
+        _blocks = (BlockNode[string]).init;
+    }
+
+
+    void popState()
+    {
+        assertJinja(_states.length > 0, "Unexpected empty state stack");
+
+        auto state = _states.back;
+        _states.popBack;
+        _tokens = state.tokens;
+        _blocks = state.blocks;
     }
 }
 

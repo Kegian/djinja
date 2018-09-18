@@ -14,6 +14,8 @@ private
 
 
 alias NodeTypes = AliasSeq!(
+        TemplateNode,
+        BlockNode,
         StmtBlockNode,
         RawNode,
         ExprNode,
@@ -36,6 +38,7 @@ alias NodeTypes = AliasSeq!(
         FilterBlockNode,
         ImportNode,
         IncludeNode,
+        ExtendsNode,
     );
 
 
@@ -59,6 +62,37 @@ mixin template AcceptVisitor()
 abstract class Node : INode
 {
     void accept(IVisitor visitor) {}
+}
+
+
+class TemplateNode : Node
+{
+    Nullable!StmtBlockNode stmt;
+    BlockNode[string] blocks;
+
+    this(StmtBlockNode stmt, BlockNode[string] blocks)
+    {
+        this.stmt = stmt.toNullable;
+        this.blocks = blocks;
+    }
+
+    mixin AcceptVisitor;
+}
+
+
+
+class BlockNode : Node
+{
+    string name;
+    Nullable!Node stmt;
+
+    this(string name, Node stmt)
+    {
+        this.name = name;
+        this.stmt = stmt.toNullable;
+    }
+
+    mixin AcceptVisitor;
 }
 
 
@@ -390,14 +424,14 @@ class ImportNode : Node
 
     string fileName;
     Rename[] macrosNames;
-    Nullable!StmtBlockNode stmtBlock;
+    Nullable!TemplateNode tmplBlock;
     bool withContext;
 
-    this(string fileName, Rename[] macrosNames, StmtBlockNode stmtBlock, bool withContext)
+    this(string fileName, Rename[] macrosNames, TemplateNode tmplBlock, bool withContext)
     {
         this.fileName = fileName;
         this.macrosNames = macrosNames;
-        this.stmtBlock = stmtBlock.toNullable;
+        this.tmplBlock = tmplBlock.toNullable;
         this.withContext = withContext;
     }
 
@@ -409,14 +443,30 @@ class ImportNode : Node
 class IncludeNode : Node
 {
     string fileName;
-    Nullable!StmtBlockNode stmtBlock;
+    Nullable!TemplateNode tmplBlock;
     bool withContext;
 
-    this(string fileName, StmtBlockNode stmtBlock, bool withContext)
+    this(string fileName, TemplateNode tmplBlock, bool withContext)
     {
         this.fileName = fileName;
-        this.stmtBlock = stmtBlock.toNullable;
+        this.tmplBlock = tmplBlock.toNullable;
         this.withContext = withContext;
+    }
+
+    mixin AcceptVisitor;
+}
+
+
+
+class ExtendsNode : Node
+{
+    string fileName;
+    Nullable!TemplateNode tmplBlock;
+
+    this(string fileName, TemplateNode tmplBlock)
+    {
+        this.fileName = fileName;
+        this.tmplBlock = tmplBlock.toNullable;
     }
 
     mixin AcceptVisitor;

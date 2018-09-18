@@ -172,15 +172,19 @@ class Render : IVisitor
 {
     private
     {
-        Node            _root;
-        Context         _context;
+        TemplateNode    _root;
         Context         _globalContext;
         UniNode[]       _dataStack;
-        string          _renderedResult;
         AppliedFilter[] _appliedFilters;
+        TemplateNode[]  _extends;
+
+        Context         _context;
+
+        string          _renderedResult;
+        bool            _isExtended;
     }
 
-    this(Node root)
+    this(TemplateNode root)
     {
         _root = root;
         _context = new Context();
@@ -191,6 +195,8 @@ class Render : IVisitor
     {
         _context = new Context(data);
         _globalContext = _context;
+        _extends = [_root];
+        _isExtended = false;
 
         foreach(key, value; globalFunctions)
             _context.functions[key] = cast(Function)value;
@@ -201,8 +207,37 @@ class Render : IVisitor
 
         _renderedResult = "";
         if (_root !is null)
-            _root.accept(this);
+            tryAccept(_root);
         return _renderedResult;
+    }
+
+
+    override void visit(TemplateNode node)
+    {
+        tryAccept(node.stmt);
+    }
+
+    override void visit(BlockNode node)
+    {
+        void super_()
+        {
+            tryAccept(node.stmt);
+        }
+
+        // TODO try to find, mixin super
+        foreach (tmpl; _extends[0 .. $-1])
+            if (node.name in tmpl.blocks)
+            {
+                pushNewContext();
+                import std.stdio: wl = writeln;
+                wl("Node: ", node.name);
+                _context.functions["super"] = wrapper!super_;
+                tryAccept(tmpl.blocks[node.name].stmt);
+                popContext();
+                return;
+            }
+
+        super_();
     }
 
 
@@ -210,7 +245,7 @@ class Render : IVisitor
     {
         pushNewContext();
         foreach(ch; node.children)
-            ch.accept(this);
+            tryAccept(ch);
         popContext();
     }
 
@@ -221,7 +256,7 @@ class Render : IVisitor
 
     override void visit(ExprNode node)
     {
-        node.expr.accept(this);
+        tryAccept(node.expr);
         auto n = pop();
         n.toStringType;
         writeToResult(n.get!string);
@@ -233,7 +268,7 @@ class Render : IVisitor
 
         if (!node.cond.isNull)
         {
-            node.cond.accept(this);
+            tryAccept(node.cond);
             auto res = pop();
             res.toBoolType;
             condition = res.get!bool;
@@ -241,11 +276,11 @@ class Render : IVisitor
 
         if (condition)
         {
-            node.expr.accept(this);
+            tryAccept(node.expr);
         }
         else if (!node.other.isNull)
         {
-            node.other.accept(this);
+            tryAccept(node.other);
         }
         else
         {
@@ -257,10 +292,10 @@ class Render : IVisitor
     {
         UniNode calc(Operator op)()
         {
-            node.lhs.accept(this);
+            tryAccept(node.lhs);
             auto lhs = pop();
 
-            node.rhs.accept(this);
+            tryAccept(node.rhs);
             auto rhs = pop();
 
             return binary!op(lhs, rhs);
@@ -268,13 +303,13 @@ class Render : IVisitor
 
         UniNode calcLogic(bool stopCondition)()
         {
-            node.lhs.accept(this);
+            tryAccept(node.lhs);
             auto lhs = pop();
             lhs.toBoolType;
             if (lhs.get!bool == stopCondition)
                 return UniNode(stopCondition);
 
-            node.rhs.accept(this);
+            tryAccept(node.rhs);
             auto rhs = pop();
             rhs.toBoolType;
             return UniNode(rhs.get!bool);
@@ -282,10 +317,10 @@ class Render : IVisitor
 
         UniNode calcCall(string type)()
         {
-            node.lhs.accept(this);
+            tryAccept(node.lhs);
             auto lhs = pop();
 
-            node.rhs.accept(this);
+            tryAccept(node.rhs);
             auto args = pop();
             auto name = args["name"].get!string;
             args["varargs"] = UniNode([lhs] ~ args["varargs"].get!(UniNode[]));
@@ -346,7 +381,7 @@ class Render : IVisitor
 
     override void visit(UnaryOpNode node)
     {
-        node.expr.accept(this);
+        tryAccept(node.expr);
         auto res = pop();
         UniNode doSwitch()
         {
@@ -391,7 +426,7 @@ class Render : IVisitor
 
         foreach (sub; node.subIdents)
         {
-            sub.accept(this);
+            tryAccept(sub);
             auto key = pop();
 
             switch (key.kind) with (UniNode.Kind)
@@ -484,7 +519,7 @@ class Render : IVisitor
 
         for(int i = 0; i < cast(long)(node.subIdents.length) - 1; i++)
         {
-            node.subIdents[i].accept(this);
+            tryAccept(node.subIdents[i]);
             auto key = pop();
 
             switch (key.kind) with (UniNode.Kind)
@@ -514,7 +549,7 @@ class Render : IVisitor
 
         if (node.subIdents.length)
         {
-            node.subIdents[$-1].accept(this);
+            tryAccept(node.subIdents[$-1]);
             auto key = pop();
 
             switch (key.kind) with (UniNode.Kind)
@@ -550,7 +585,7 @@ class Render : IVisitor
         UniNode[] list = [];
         foreach (l; node.list)
         {
-            l.accept(this);
+            tryAccept(l);
             list ~= pop();
         }
         push(UniNode(list));
@@ -561,7 +596,7 @@ class Render : IVisitor
         UniNode[string] dict;
         foreach (key, value; node.dict)
         {
-            value.accept(this);
+            tryAccept(value);
             dict[key] = pop();
         }
         push(UniNode(dict));
@@ -569,18 +604,18 @@ class Render : IVisitor
 
     override void visit(IfNode node)
     {
-        node.cond.accept(this);
+        tryAccept(node.cond);
 
         auto cond = pop();
         cond.toBoolType;
 
         if (cond.get!bool)
         {
-            node.then.accept(this);
+            tryAccept(node.then);
         }
         else if (node.other)
         {
-            node.other.accept(this);
+            tryAccept(node.other);
         }
     }
 
@@ -594,7 +629,7 @@ class Render : IVisitor
             if (!node.cond.isNull)
             {
                 () @trusted {
-                    node.cond.accept(this);
+                    tryAccept(node.cond);
                     auto cond = pop();
                     cond.toBoolType;
                     condition = cond.get!bool;
@@ -627,7 +662,7 @@ class Render : IVisitor
                     if (calcCondition())
                     {
                         // TODO UPDATE LOOP VARS
-                        node.block.accept(this);
+                        tryAccept(node.block);
                         iterated = true;
                     }
                 } ();
@@ -636,23 +671,23 @@ class Render : IVisitor
 
         pushNewContext();
 
-        node.iterable.accept(this);
+        tryAccept(node.iterable);
         UniNode iterable = pop();
         loop(iterable);
 
         popContext();
 
         if (!iterated && !node.other.isNull)
-            node.other.accept(this);
+            tryAccept(node.other);
     }
 
 
     override void visit(SetNode node)
     {
-        node.expr.accept(this);
+        tryAccept(node.expr);
 
         if (node.assigns.length == 1)
-            node.assigns[0].accept(this);            
+            tryAccept(node.assigns[0]);            
         else
         {
             auto expr = pop();
@@ -664,7 +699,7 @@ class Render : IVisitor
             foreach(idx, assign; node.assigns)
             {
                 push(expr[idx]);
-                assign.accept(this);
+                tryAccept(assign);
             }
         }
     }
@@ -680,7 +715,7 @@ class Render : IVisitor
                 args ~= FormArg(arg.name);
             else
             {
-                arg.defaultExpr.accept(this);
+                tryAccept(arg.defaultExpr);
                 args ~= FormArg(arg.name, pop());
             }
         }
@@ -699,14 +734,14 @@ class Render : IVisitor
                 args ~= FormArg(arg.name);
             else
             {
-                arg.defaultExpr.accept(this);
+                tryAccept(arg.defaultExpr);
                 args ~= FormArg(arg.name, pop());
             }
         }
 
         auto caller = Macro(args, _context, node.block);
 
-        node.factArgs.accept(this);
+        tryAccept(node.factArgs);
         auto factArgs = pop();
 
         visitMacro(node.macroName, factArgs, caller.nullable);
@@ -715,18 +750,18 @@ class Render : IVisitor
 
     override void visit(FilterBlockNode node)
     {
-        node.args.accept(this);
+        tryAccept(node.args);
         auto args = pop();
 
         pushFilter(node.filterName, args);
-        node.block.accept(this);
+        tryAccept(node.block);
         popFilter();
     }
 
 
     override void visit(ImportNode node)
     {
-        if (node.stmtBlock.isNull)
+        if (node.tmplBlock.isNull)
             return;
 
         auto stashedContext = _context;
@@ -739,8 +774,8 @@ class Render : IVisitor
 
         pushNewContext();
 
-        foreach (child; node.stmtBlock.children)
-            child.accept(this);
+        foreach (child; node.tmplBlock.stmt.children)
+            tryAccept(child);
 
         auto macros = _context.macros;
 
@@ -765,7 +800,7 @@ class Render : IVisitor
 
     override void visit(IncludeNode node)
     {
-        if (node.stmtBlock.isNull)
+        if (node.tmplBlock.isNull)
             return;
 
         auto stashedContext = _context;
@@ -773,14 +808,28 @@ class Render : IVisitor
         if (!node.withContext)
             _context = _globalContext;
 
-        node.stmtBlock.accept(this);
+        tryAccept(node.tmplBlock);
 
         if (!node.withContext)
             _context = stashedContext;
     }
 
 
+    override void visit(ExtendsNode node)
+    {
+        _extends ~= node.tmplBlock;
+        tryAccept(node.tmplBlock);
+        _extends.popBack;
+        _isExtended = true;
+    }
+
 private:
+
+    void tryAccept(Node node)
+    {
+        if (!_isExtended)
+            node.accept(this);
+    }
 
     UniNode visitFunc(string name, UniNode args)
     {
@@ -832,7 +881,7 @@ private:
         if (!caller.isNull)
             _context.macros["caller"] = caller;
 
-        macro_.block.accept(this);
+        tryAccept(macro_.block);
         result = pop();
 
         popContext();
@@ -911,6 +960,9 @@ private:
 
     void popFilter()
     {
+        if (!_appliedFilters.length)
+            throw new JinjaRenderException("Unexpected empty filter stack");
+
         _appliedFilters.popBack;
     }
 }

@@ -39,6 +39,43 @@ class Printer : NullVisitor
     }
 
 
+    override void visit(TemplateNode node)
+    {
+        print("Template:");
+
+        _tab++;
+
+        if (!node.blocks.length)
+            print("Blocks: NONE");
+        else
+        {
+            print("Blocks:");
+            _tab++;
+            foreach (key, block; node.blocks)
+                print(key);
+            _tab--;
+        }
+
+        print("Statements:");
+        _tab++;
+        if (!node.stmt.isNull)
+            node.stmt.accept(this);
+        _tab--;
+
+        _tab--;
+    }
+
+
+    override void visit(BlockNode node)
+    {
+        print("Block: %s".fmt(node.name));
+        _tab++;
+        if (!node.stmt.isNull)
+            node.stmt.accept(this);
+        _tab--;
+    }
+
+
     override void visit(RawNode node)
     {
         import std.array : replace;
@@ -99,6 +136,7 @@ class Printer : NullVisitor
         _tab--;
     }
 
+
     override void visit(UnaryOpNode node)
     {
         print("UnaryOp: %s".fmt(node.op));
@@ -106,6 +144,7 @@ class Printer : NullVisitor
         node.expr.accept(this);
         _tab--;
     }
+
 
     override void visit(NumNode node)
     {
@@ -115,15 +154,18 @@ class Printer : NullVisitor
             print("Float: %f".fmt(node.data._float));
     }
 
+
     override void visit(BooleanNode node)
     {
         print("Bool: %s".fmt(node.boolean));
     }
 
+
     override void visit(NilNode node)
     {
         print("Nil");
     }
+
 
     override void visit(IdentNode node)
     {
@@ -137,6 +179,7 @@ class Printer : NullVisitor
             _tab--;
         }
     }
+
 
     override void visit(AssignableNode node)
     {
@@ -153,6 +196,7 @@ class Printer : NullVisitor
         }
     }
 
+
     override void visit(StringNode node)
     {
         print("String: %s".fmt(node.str));
@@ -168,6 +212,7 @@ class Printer : NullVisitor
         _tab--;
     }
 
+
     override void visit(DictNode node)
     {
         print("Dict:");
@@ -182,6 +227,7 @@ class Printer : NullVisitor
         }
         _tab--;
     }
+
 
     override void visit(IfNode node)
     {
@@ -209,6 +255,7 @@ class Printer : NullVisitor
             print("Else: NONE");
         _tab--;
     }
+
 
     override void visit(ForNode node)
     {
@@ -405,10 +452,10 @@ class Printer : NullVisitor
             _tab--;
         }
 
-        if (node.stmtBlock.isNull)
+        if (node.tmplBlock.isNull)
             print("Block: Missing");
         else
-            print("Block: %s children".fmt(node.stmtBlock.children.length));
+            print("Block: %s children".fmt(node.tmplBlock.stmt.children.length));
 
         if (node.withContext)
             print("Context: with");
@@ -425,15 +472,30 @@ class Printer : NullVisitor
 
         _tab++;
 
-        if (node.stmtBlock.isNull)
+        if (node.tmplBlock.isNull)
             print("Block: Missing");
         else
-            print("Block: %s children".fmt(node.stmtBlock.children.length));
+            print("Block: %s children".fmt(node.tmplBlock.stmt.children.length));
 
         if (node.withContext)
             print("Context: with");
         else
             print("Context: without");
+
+        _tab--;
+    }
+
+
+    override void visit(ExtendsNode node)
+    {
+        print("Extends: '%s'".fmt(node.fileName));
+
+        _tab++;
+
+        if (node.tmplBlock.isNull)
+            print("Block: Missing");
+        else
+            print("Block: %s children".fmt(node.tmplBlock.stmt.children.length));
 
         _tab--;
     }
