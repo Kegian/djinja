@@ -68,15 +68,9 @@ class Context
         data = UniNode.emptyObject();
     }
 
-    this (Context ctx)
+    this (Context ctx, UniNode data)
     {
         prev = ctx;
-        data = UniNode.emptyObject();
-    }
-
-    this (UniNode data)
-    {
-        prev = null;
         this.data = data;
     }
 
@@ -174,6 +168,7 @@ class Render : IVisitor
     {
         TemplateNode    _root;
         Context         _globalContext;
+        Context         _rootContext;
         UniNode[]       _dataStack;
         AppliedFilter[] _appliedFilters;
         TemplateNode[]  _extends;
@@ -187,23 +182,24 @@ class Render : IVisitor
     this(TemplateNode root)
     {
         _root = root;
-        _context = new Context();
+        _rootContext = new Context();
+
+        foreach(key, value; globalFunctions)
+            _rootContext.functions[key] = cast(Function)value;
+        foreach(key, value; globalFilters)
+            _rootContext.functions[key] = cast(Function)value;
+        foreach(key, value; globalTests)
+            _rootContext.functions[key] = cast(Function)value;
     }
 
 
     string render(UniNode data)
     {
-        _context = new Context(data);
+        _context = new Context(_rootContext, data);
         _globalContext = _context;
+
         _extends = [_root];
         _isExtended = false;
-
-        foreach(key, value; globalFunctions)
-            _context.functions[key] = cast(Function)value;
-        foreach(key, value; globalFilters)
-            _context.functions[key] = cast(Function)value;
-        foreach(key, value; globalTests)
-            _context.functions[key] = cast(Function)value;
 
         _renderedResult = "";
         if (_root !is null)
@@ -224,13 +220,10 @@ class Render : IVisitor
             tryAccept(node.stmt);
         }
 
-        // TODO try to find, mixin super
         foreach (tmpl; _extends[0 .. $-1])
             if (node.name in tmpl.blocks)
             {
                 pushNewContext();
-                import std.stdio: wl = writeln;
-                wl("Node: ", node.name);
                 _context.functions["super"] = wrapper!super_;
                 tryAccept(tmpl.blocks[node.name].stmt);
                 popContext();
@@ -831,6 +824,7 @@ private:
             node.accept(this);
     }
 
+
     UniNode visitFunc(string name, UniNode args)
     {
         return _context.getFunc(name)(args);
@@ -927,7 +921,7 @@ private:
 
     void pushNewContext()
     {
-        _context = new Context(_context);
+        _context = new Context(_context, UniNode.emptyObject);
     }
 
 
@@ -953,10 +947,12 @@ private:
         return un;
     }
 
+
     void pushFilter(string name, UniNode args)
     {
         _appliedFilters ~= AppliedFilter(name, args);
     }
+
 
     void popFilter()
     {
@@ -965,6 +961,19 @@ private:
 
         _appliedFilters.popBack;
     }
+}
+
+
+void registerFunction(alias func)(Render render, string name)
+{
+    render._rootContext.functions[name] = wrapper!func;
+}
+
+
+void registerFunction(alias func)(Render render)
+{
+    enum name = __traits(identifier, func);
+    render._rootContext.functions[name] = wrapper!func;
 }
 
 

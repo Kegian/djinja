@@ -91,27 +91,28 @@ struct Parser(Lexer)
 
     TemplateNode parseTree(string str)
     {
-        auto lexer = Lexer(str);
-
         stashState();
 
-        //TODO appender
+        auto lexer = Lexer(str);
+        auto newTokens = appender!(Token[]);
+
         while (true)
         {
             auto tkn = lexer.nextToken;
-            _tokens ~= tkn; 
+            newTokens.put(tkn); 
             if (tkn.type == Type.EOF)
                 break;
         }
+        _tokens = newTokens.data;
 
         preprocess();
 
         auto root = parseStatementBlock();
+        auto blocks = _blocks;
 
         if (front.type != Type.EOF)
             throw new JinjaParserException("Expected EOF found %s(%s)".fmt(front.type, front.value));
 
-        auto blocks = _blocks;
         popState();
 
         return new TemplateNode(root, blocks);
@@ -292,7 +293,7 @@ private:
 
     IfNode parseIf()
     {
-        //TODO: If or ElIf
+        assertJinja(front == Keyword.If || front == Keyword.ElIf);
         pop();
         auto cond = parseHighLevelExpression();
         pop(Type.StmtEnd);
@@ -307,16 +308,12 @@ private:
                 auto other = parseIf();
                 return new IfNode(cond, then, other);
             case Else:
-                pop(Keyword.Else);
-                pop(Type.StmtEnd);
+                pop(Keyword.Else, Type.StmtEnd);
                 auto other = parseStatementBlock();
-                pop(Type.StmtBegin);
-                pop(Keyword.EndIf);
-                pop(Type.StmtEnd);
+                pop(Type.StmtBegin, Keyword.EndIf, Type.StmtEnd);
                 return new IfNode(cond, then, other);
             case EndIf:
-                pop(Keyword.EndIf);
-                pop(Type.StmtEnd);
+                pop(Keyword.EndIf, Type.StmtEnd);
                 return new IfNode(cond, then, null);
             default:
                 throw new JinjaParserException("Enexppected token %s".fmt(front.value));
@@ -384,8 +381,7 @@ private:
 
         auto block = parseStatementBlock();
 
-        pop(Type.StmtBegin);
-        pop(Keyword.EndMacro);
+        pop(Type.StmtBegin, Keyword.EndMacro);
 
         bool ret = false;
         if (front.type == Type.Keyword && front.value == Keyword.Return)
@@ -424,9 +420,7 @@ private:
         auto block = parseStatementBlock();
         block.children ~= new StringNode("");
 
-        pop(Type.StmtBegin);
-        pop(Keyword.EndCall);
-        pop(Type.StmtEnd);
+        pop(Type.StmtBegin, Keyword.EndCall, Type.StmtEnd);
 
         return new CallNode(macroName, formalArgs, factArgs, block);
     }
@@ -443,9 +437,7 @@ private:
 
         auto block = parseStatementBlock();
 
-        pop(Type.StmtBegin);
-        pop(Keyword.EndFilter);
-        pop(Type.StmtEnd);
+        pop(Type.StmtBegin, Keyword.EndFilter, Type.StmtEnd);
 
         return new FilterBlockNode(filterName, args, block);
     }
@@ -453,14 +445,9 @@ private:
 
     StmtBlockNode parseWith()
     {
-        pop(Keyword.With);
-        pop(Type.StmtEnd);
-
+        pop(Keyword.With, Type.StmtEnd);
         auto block = parseStatementBlock();
-
-        pop(Type.StmtBegin);
-        pop(Keyword.EndWith);
-        pop(Type.StmtEnd);
+        pop(Type.StmtBegin, Keyword.EndWith, Type.StmtEnd);
 
         return block;
     }
@@ -475,15 +462,13 @@ private:
         if (front == Keyword.With)
         {
             withContext = true;
-            pop(Keyword.With);
-            pop(Keyword.Context);
+            pop(Keyword.With, Keyword.Context);
         }
 
         if (front == Keyword.Without)
         {
             withContext = false;
-            pop(Keyword.Without);
-            pop(Keyword.Context);
+            pop(Keyword.Without, Keyword.Context);
         }
 
         pop(Type.StmtEnd);
@@ -529,15 +514,13 @@ private:
         if (front == Keyword.With)
         {
             withContext = true;
-            pop(Keyword.With);
-            pop(Keyword.Context);
+            pop(Keyword.With, Keyword.Context);
         }
 
         if (front == Keyword.Without)
         {
             withContext = false;
-            pop(Keyword.Without);
-            pop(Keyword.Context);
+            pop(Keyword.Without, Keyword.Context);
         }
 
         pop(Type.StmtEnd);
@@ -577,8 +560,7 @@ private:
         bool ignoreMissing = false;
         if (front == Keyword.Ignore)
         {
-            pop(Keyword.Ignore);
-            pop(Keyword.Missing);
+            pop(Keyword.Ignore, Keyword.Missing);
             ignoreMissing = true;
         }
 
@@ -587,15 +569,13 @@ private:
         if (front == Keyword.With)
         {
             withContext = true;
-            pop(Keyword.With);
-            pop(Keyword.Context);
+            pop(Keyword.With, Keyword.Context);
         }
 
         if (front == Keyword.Without)
         {
             withContext = false;
-            pop(Keyword.Without);
-            pop(Keyword.Context);
+            pop(Keyword.Without, Keyword.Context);
         }
 
         pop(Type.StmtEnd);
@@ -632,10 +612,11 @@ private:
 
         auto stmt = parseStatementBlock();
 
-        pop(Type.StmtBegin);
-        pop(Keyword.EndBlock);
+        pop(Type.StmtBegin, Keyword.EndBlock);
+
         if (front == Type.Ident)
             assertJinja(pop.value == name, "Missmatching block's begin/end names");
+
         pop(Type.StmtEnd);
 
         return new BlockNode(name, stmt);
@@ -1187,6 +1168,14 @@ private:
         if (front.type != Type.Operator || front.value != op)
             throw new JinjaParserException("Unexpected token %s, expected op: %s".fmt(front.value, op));
         return pop();
+    }
+
+
+    void pop(T...)(T args)
+        if (args.length > 1)
+    {
+        foreach(arg; args)
+            pop(arg);
     }
 
 
