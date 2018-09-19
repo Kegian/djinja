@@ -22,6 +22,7 @@ enum Type
     ExprEnd,
     CmntBegin,
     CmntEnd,
+    CmntInline,
 
     Ident,
     Integer,
@@ -225,7 +226,8 @@ struct Token
 struct Lexer(
         string exprOpBegin, string exprOpEnd,
         string stmtOpBegin, string stmtOpEnd,
-        string cmntOpBegin, string cmntOpEnd)
+        string cmntOpBegin, string cmntOpEnd,
+        string stmtOpInline, string cmntOpInline)
 {
     static assert(exprOpBegin.length, "Expression begin operator can't be empty");
     static assert(exprOpEnd.length, "Expression end operator can't be empty");
@@ -244,6 +246,7 @@ struct Lexer(
     private
     {
         bool _isReadingRaw;
+        bool _isInlineStmt;
         string _str;
     }
 
@@ -251,6 +254,7 @@ struct Lexer(
     {
         _str = str;
         _isReadingRaw = true;
+        _isInlineStmt = false;
     }
 
     Token nextToken()
@@ -265,6 +269,29 @@ struct Lexer(
         }
 
         skipWhitespaces();
+
+        if (_isInlineStmt && front == '\n')
+        {
+            _isInlineStmt = false;
+            _isReadingRaw = true;
+            pop();
+            return Token(Type.StmtEnd, "\\n");
+        }
+
+        // Allow multiline inline statements with '\'
+        while (true)
+        {
+            if (_isInlineStmt && front(2) == "\\\n")
+                skip(2);
+            else if (_isInlineStmt && front(3) == "\\\r\n")
+                skip(3);
+            else
+                break;
+
+            skipWhitespaces();
+        }
+
+
 
         // Check begin operators
         if (exprOpBegin == front(exprOpBegin.length))
@@ -302,6 +329,20 @@ struct Lexer(
             _isReadingRaw = true;
             skip(cmntOpEnd.length);
             return Token(Type.CmntEnd, cmntOpEnd);
+        }
+
+        // Check begin online operators
+        if (cmntOpInline == front(cmntOpInline.length))
+        {
+            skipInlineComment();
+            _isReadingRaw = true;
+            return Token(Type.CmntInline);
+        }
+        if (stmtOpInline == front(stmtOpInline.length))
+        {
+            skip(stmtOpInline.length);
+            _isInlineStmt = true;
+            return Token(Type.StmtBegin, stmtOpInline);
         }
 
         // Trying to read 'include' kw before 'in' op
@@ -423,9 +464,13 @@ private:
             switch (front)
             {
                 case ' ':
-                case '\n':
                 case '\t':
                 case '\r':
+                    pop();
+                    break;
+                case '\n':
+                    if (_isInlineStmt)
+                        return;
                     pop();
                     break;
                 default:
@@ -524,6 +569,10 @@ private:
                 return raw;
             if (cmntOpBegin == front(cmntOpBegin.length))
                 return raw;
+            if (stmtOpInline == front(stmtOpInline.length))
+                return raw;
+            if (cmntOpInline == front(cmntOpInline.length))
+                return raw;
             
             raw ~= pop();
         }
@@ -536,6 +585,20 @@ private:
         {
             if (cmntOpEnd == front(cmntOpEnd.length))
                 return;
+            pop();
+        }
+    }
+
+
+    void skipInlineComment()
+    {
+        while(front != EOF)
+        {
+            if (front == '\n')
+            {
+                pop();
+                return;
+            }
             pop();
         }
     }

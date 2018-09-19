@@ -126,7 +126,7 @@ struct Parser(Lexer)
         if (auto cached = path in _parsedFiles)
         {
             if (*cached is null)
-                throw new JinjaParserException("Recursive imports not allowed");
+                throw new JinjaParserException("Recursive imports/includes/extends not allowed");
             else
                 return *cached;
         }
@@ -177,6 +177,10 @@ private:
 
                 case CmntBegin:
                     parseComment();
+                    break;
+
+                case CmntInline:
+                    pop();
                     break;
 
                 case StmtBegin:

@@ -16,21 +16,19 @@ private
 
 TemplateNode loadData(string tmpl)
 {
-    alias JinjaLexer = Lexer!("{{", "}}", "{%", "%}", "{#", "#}");
+    alias JinjaLexer = Lexer!("{{", "}}", "{%", "%}", "{#", "#}", "#", "##");
 
     Parser!JinjaLexer parser;
-    auto tree = parser.parseTree(tmpl);
-    return tree;
+    return parser.parseTree(tmpl);
 }
 
 
 TemplateNode loadFile(string path)
 {
-    alias JinjaLexer = Lexer!("{{", "}}", "{%", "%}", "{#", "#}");
+    alias JinjaLexer = Lexer!("{{", "}}", "{%", "%}", "{#", "#}", "#", "##");
 
     Parser!JinjaLexer parser;
-    auto tree = parser.parseTreeFromFile(tmpl);
-    return tree;
+    return parser.parseTreeFromFile(path);
 }
 
 
@@ -58,6 +56,12 @@ string render(T...)(TemplateNode tree)
 string renderData(T...)(string tmpl)
 {
     return render!(T)(loadData(tmpl));
+}
+
+
+string renderFile(T...)(string path)
+{
+    return render!(T)(loadFile(path));
 }
 
 
