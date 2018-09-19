@@ -40,11 +40,15 @@ template wrapper(alias F)
 
             foreach(i, def; ParameterDefs)
             {
-                string key = ParameterIdents[i];
-                static if (is(def == void))
-                    filled[key] = false;
-                else
+                alias key = ParameterIdents[i];
+                static if (key == "varargs")
+                    args[i] = UniNode.emptyArray;
+                else static if (key == "kwargs")
+                    args[i] = UniNode.emptyObject;
+                else static if (!is(def == void))
                     args[i] = def;
+                else
+                    filled[key] = false;
             }
 
             void fillArg(size_t idx, PType)(string key, UniNode val)
@@ -57,22 +61,60 @@ template wrapper(alias F)
                                             .fmt(key, val.kind, PType.stringof, fullyQualifiedName!F));
             }
 
+            UniNode varargs = UniNode.emptyArray;
+            UniNode kwargs = UniNode.emptyObject;
+
+            bool isVarargs = false;
+            int varargsFilled = 0;
             static foreach (int i; 0 .. PT.length)
             {
+                static if (ParameterIdents[i] == "varargs" || ParameterIdents[i] == "kwargs")
+                {
+                    isVarargs = true;
+                }
                 if (params["varargs"].length > i)
                 {
-                    fillArg!(i, ParameterTypes[i])(ParameterIdents[i], params["varargs"][i]);
-                    filled[ParameterIdents[i]] = true;
+                    if (!isVarargs)
+                    {
+                        fillArg!(i, ParameterTypes[i])(ParameterIdents[i], params["varargs"][i]);
+                        filled[ParameterIdents[i]] = true;
+                    }
+                    else
+                        varargs.appendArrayElement(params["varargs"][i]);
+                    varargsFilled++;
                 }
             }
+            // Filled missed varargs
+            if (varargsFilled < params["varargs"].length)
+                foreach(i; varargsFilled .. params["varargs"].length)
+                    varargs.appendArrayElement(params["varargs"][i]);
 
+            bool[string] kwargsFilled;
             static foreach(i, key; ParameterIdents)
             {
                 if (key in params["kwargs"])
                 {
                     fillArg!(i, ParameterTypes[i])(key, params["kwargs"][key]);
                     filled[ParameterIdents[i]] = true;
+                    kwargsFilled[key] = true;
                 }
+            }
+            // Filled missed kwargs
+            () @safe  {
+                foreach (key, val; params["kwargs"])
+                {
+                    if (key !in kwargsFilled)
+                        kwargs[key] = val;
+                }
+            } ();
+
+            // Fill varargs/kwargs
+            foreach(i, key; ParameterIdents)
+            {
+                static if (key == "varargs")
+                    args[i] = varargs;
+                else static if (key == "kwargs")
+                    args[i] = kwargs;
             }
 
             string[] missedArgs = [];

@@ -465,7 +465,6 @@ class Render : IVisitor
                 case object:
                     auto name = key["name"].get!string;
 
-                    //TODO check name/varargs/kwargs
                     if (!curr.isNull)
                         key["varargs"] = UniNode([curr] ~ key["varargs"].get!(UniNode[]));
 
@@ -615,6 +614,7 @@ class Render : IVisitor
     override void visit(ForNode node)
     {
         bool iterated = false;
+        int depth = 0; 
 
         bool calcCondition() @safe
         {
@@ -631,44 +631,95 @@ class Render : IVisitor
             return condition;
         }
 
-        void loop(UniNode iterable) @safe
+        UniNode cycle(UniNode loop, UniNode varargs)
         {
-            iterable.toIterableNode;
-            foreach(ref it; iterable)
-            {
-                () @trusted {
-                    if (node.isRecursive)
-                    {
-                        _context.functions["loop"] = wrapper!loop;
-                    }
+            if (!varargs.length)
+                return UniNode(null);
+            return varargs[loop["index0"].get!long % varargs.length];
+        }
 
+
+        void loop(UniNode iterable)
+        {
+            UniNode lastVal = UniNode(null);
+            bool changed(UniNode loop, UniNode val)
+            {
+                if (val == lastVal)
+                    return false;
+                lastVal = val;
+                return true;
+            }
+
+            depth++;
+            pushNewContext();
+
+            _context.data["loop"] = UniNode.emptyObject;
+            _context.functions["cycle"] = wrapper!cycle;
+            _context.functions["changed"] = wrapper!changed;
+
+            iterable.toIterableNode;
+
+            if (!node.cond.isNull)
+            {
+                auto newIterable = UniNode.emptyArray;
+                for (int i = 0; i < iterable.length; i++)
+                {
                     if (node.keys.length == 1)
-                        _context.data[node.keys[0]] = it;
+                        _context.data[node.keys[0]] = iterable[i];
                     else
                     {
-                        it.checkNodeType(UniNode.Kind.array);
-                        assertJinja(it.length >= node.keys.length, "Num of keys less then values");
-                        foreach(i, key; node.keys)
-                            _context.data[key] = it[i];
+                        iterable[i].checkNodeType(UniNode.Kind.array);
+                        assertJinja(iterable[i].length >= node.keys.length, "Num of keys less then values");
+                        foreach(j, key; node.keys)
+                            _context.data[key] = iterable[i][j];
                     }
 
                     if (calcCondition())
-                    {
-                        // TODO UPDATE LOOP VARS
-                        tryAccept(node.block);
-                        iterated = true;
-                    }
-                } ();
+                        newIterable.appendArrayElement(iterable[i]);
+                }
+                iterable = newIterable;
             }
+
+            _context.data["loop"]["length"] = UniNode(iterable.length);
+            _context.data["loop"]["depth"] = UniNode(depth);
+            _context.data["loop"]["depth0"] = UniNode(depth - 1);
+
+            for (int i = 0; i < iterable.length; i++)
+            {
+                _context.data["loop"]["index"] = UniNode(i + 1);
+                _context.data["loop"]["index0"] = UniNode(i);
+                _context.data["loop"]["revindex"] = UniNode(iterable.length - i);
+                _context.data["loop"]["revindex0"] = UniNode(iterable.length - i - 1);
+                _context.data["loop"]["first"] = UniNode(i == 0);
+                _context.data["loop"]["last"] = UniNode(i == iterable.length - 1);
+                _context.data["loop"]["previtem"] = i > 0 ? iterable[i - 1] : UniNode(null);
+                _context.data["loop"]["nextitem"] = i < iterable.length - 1 ? iterable[i + 1] : UniNode(null);
+
+                if (node.isRecursive)
+                    _context.functions["loop"] = wrapper!loop;
+
+                if (node.keys.length == 1)
+                    _context.data[node.keys[0]] = iterable[i];
+                else
+                {
+                    iterable[i].checkNodeType(UniNode.Kind.array);
+                    assertJinja(iterable[i].length >= node.keys.length, "Num of keys less then values");
+                    foreach(j, key; node.keys)
+                        _context.data[key] = iterable[i][j];
+                }
+
+                tryAccept(node.block);
+                iterated = true;
+            }
+            popContext();
+            depth--;
         }
 
-        pushNewContext();
+
 
         tryAccept(node.iterable);
         UniNode iterable = pop();
         loop(iterable);
-
-        popContext();
 
         if (!iterated && !node.other.isNull)
             tryAccept(node.other);

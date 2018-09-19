@@ -238,6 +238,9 @@ struct Lexer(
     static assert(cmntOpBegin.length, "Comment begin operator can't be empty");
     static assert(cmntOpEnd.length, "Comment end operator can't be empty");
 
+    static assert(stmtOpInline.length, "Statement inline operator can't be empty");
+    static assert(cmntOpInline.length, "Comment inline operator can't be empty");
+
     //TODO check uniq
 
     
@@ -270,12 +273,12 @@ struct Lexer(
 
         skipWhitespaces();
 
+        // Check inline statement end
         if (_isInlineStmt && front == '\n')
         {
             _isInlineStmt = false;
             _isReadingRaw = true;
-            pop();
-            return Token(Type.StmtEnd, "\\n");
+            return Token(Type.StmtEnd, [pop]);
         }
 
         // Allow multiline inline statements with '\'
