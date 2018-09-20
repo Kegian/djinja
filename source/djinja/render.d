@@ -641,10 +641,10 @@ class Render : IVisitor
 
         void loop(UniNode iterable)
         {
-            UniNode lastVal = UniNode(null);
+            Nullable!UniNode lastVal;
             bool changed(UniNode loop, UniNode val)
             {
-                if (val == lastVal)
+                if (!lastVal.isNull && val == lastVal.get)
                     return false;
                 lastVal = val;
                 return true;
@@ -652,10 +652,6 @@ class Render : IVisitor
 
             depth++;
             pushNewContext();
-
-            _context.data["loop"] = UniNode.emptyObject;
-            _context.functions["cycle"] = wrapper!cycle;
-            _context.functions["changed"] = wrapper!changed;
 
             iterable.toIterableNode;
 
@@ -680,9 +676,12 @@ class Render : IVisitor
                 iterable = newIterable;
             }
 
+            _context.data["loop"] = UniNode.emptyObject;
             _context.data["loop"]["length"] = UniNode(iterable.length);
             _context.data["loop"]["depth"] = UniNode(depth);
             _context.data["loop"]["depth0"] = UniNode(depth - 1);
+            _context.functions["cycle"] = wrapper!cycle;
+            _context.functions["changed"] = wrapper!changed;
 
             for (int i = 0; i < iterable.length; i++)
             {

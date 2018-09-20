@@ -504,7 +504,7 @@ class Printer : NullVisitor
     void print(string str)
     {
         foreach(i; 0 .. _tab)
-            w(" -- ");
+            w("--  ");
         wl(str);
     }
 }
