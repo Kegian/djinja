@@ -14,22 +14,57 @@ private
 }
 
 
-TemplateNode loadData(string tmpl)
+
+struct JinjaConfig
 {
-    alias JinjaLexer = Lexer!("{{", "}}", "{%", "%}", "{#", "#}", "#", "##");
+    string exprOpBegin  = "{{";
+    string exprOpEnd    = "}}";
+    string stmtOpBegin  = "{%";
+    string stmtOpEnd    = "%}";
+    string cmntOpBegin  = "{#";
+    string cmntOpEnd    = "#}";
+    string cmntOpInline = "##";
+    string stmtOpInline = "#";
+}
+
+
+
+TemplateNode loadData(JinjaConfig config = defaultConfig)(string tmpl)
+{
+    alias JinjaLexer = Lexer!(
+                            config.exprOpBegin,
+                            config.exprOpEnd,
+                            config.stmtOpBegin,
+                            config.stmtOpEnd,
+                            config.cmntOpBegin,
+                            config.cmntOpEnd,
+                            config.stmtOpInline,
+                            config.cmntOpInline
+                        );
 
     Parser!JinjaLexer parser;
     return parser.parseTree(tmpl);
 }
 
 
-TemplateNode loadFile(string path)
+
+TemplateNode loadFile(JinjaConfig config = defaultConfig)(string path)
 {
-    alias JinjaLexer = Lexer!("{{", "}}", "{%", "%}", "{#", "#}", "#", "##");
+    alias JinjaLexer = Lexer!(
+                            config.exprOpBegin,
+                            config.exprOpEnd,
+                            config.stmtOpBegin,
+                            config.stmtOpEnd,
+                            config.cmntOpBegin,
+                            config.cmntOpEnd,
+                            config.stmtOpInline,
+                            config.cmntOpInline
+                        );
 
     Parser!JinjaLexer parser;
     return parser.parseTreeFromFile(path);
 }
+
 
 
 string render(T...)(TemplateNode tree)
@@ -53,19 +88,41 @@ string render(T...)(TemplateNode tree)
 }
 
 
+
 string renderData(T...)(string tmpl)
 {
-    return render!(T)(loadData(tmpl));
+    static if (T.length > 0 && is(typeof(T[0]) == JinjaConfig))
+        return render!(T[1 .. $])(loadData!(T[0])(tmpl));
+    else
+        return render!(T)(loadData!defaultConfig(tmpl));
 }
+
 
 
 string renderFile(T...)(string path)
 {
-    return render!(T)(loadFile(path));
+    static if (T.length > 0 && is(typeof(T[0]) == JinjaConfig))
+        return render!(T[1 .. $])(loadFile!(T[0])(path));
+    else
+        return render!(T)(loadFile!defaultConfig(path));
 }
 
 
+
+void print(TemplateNode tree)
+{
+    auto printer = new Printer;
+    tree.accept(printer);
+}
+
+
+
 private:
+
+
+
+enum defaultConfig = JinjaConfig.init;
+
 
 
 template Ident(alias A)

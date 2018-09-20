@@ -213,9 +213,7 @@ UniNode unary(string op)(UniNode lhs)
 UniNode binary(string op)(UniNode lhs, UniNode rhs)
     if (op.among!(Operator.Plus,
                  Operator.Minus,
-                 Operator.Mul,
-                 Operator.DivFloat,
-                 Operator.Rem)
+                 Operator.Mul)
     )
 {
     toCommonNumType(lhs, rhs);
@@ -233,6 +231,26 @@ UniNode binary(string op)(UniNode lhs, UniNode rhs)
     assertJinja(lhs.isIntNode, "Expected int got %s".fmt(lhs.kind));
     assertJinja(rhs.isIntNode, "Expected int got %s".fmt(rhs.kind));
     return UniNode(lhs.get!long / rhs.get!long);
+}
+
+
+
+UniNode binary(string op)(UniNode lhs, UniNode rhs)
+    if (op == Operator.DivFloat
+        || op == Operator.Rem)
+{
+    toCommonNumType(lhs, rhs);
+
+    if (lhs.isIntNode)
+    {
+        assertJinja(rhs.get!long != 0, "Divizion by zero!");
+        return UniNode(mixin("lhs.get!long" ~ op ~ "rhs.get!long"));
+    }
+    else
+    {
+        assertJinja(rhs.get!double != 0, "Divizion by zero!");
+        return UniNode(mixin("lhs.get!double" ~ op ~ "rhs.get!double"));
+    }
 }
 
 

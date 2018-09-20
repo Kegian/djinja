@@ -101,9 +101,7 @@ class StmtBlockNode : Node
 {
     Node[] children;
 
-    this()
-    {
-    }
+    this() {}
 
     mixin AcceptVisitor;
 }

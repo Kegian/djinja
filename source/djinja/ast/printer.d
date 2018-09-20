@@ -266,7 +266,7 @@ class Printer : NullVisitor
         _tab++;
         foreach (key; node.keys)
             print(key);
-        _tab++;
+        _tab--;
 
         print("Iterable:");
         _tab++;
@@ -501,10 +501,13 @@ class Printer : NullVisitor
     }
 
 
+protected:
+
+
     void print(string str)
     {
         foreach(i; 0 .. _tab)
-            w("--  ");
+            w("-   ");
         wl(str);
     }
 }
