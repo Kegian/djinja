@@ -1,0 +1,8 @@
+{
+	"fileVersion": 1,
+	"versions": {
+		"stdx-allocator": "2.77.2",
+		"uninode": "0.0.1-beta.2",
+		"vibe-d": "0.8.4"
+	}
+}

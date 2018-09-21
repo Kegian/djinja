@@ -11,9 +11,10 @@ public
 private
 {
     import std.array : array;
-    import std.algorithm : among, map;
-    import std.format: fmt = format;
+    import std.algorithm : among, map, sort;
     import std.conv : to;
+    import std.format: fmt = format;
+    import std.typecons : Tuple, tuple;
 
     import djinja.lexer;
     import djinja.exception : JinjaRenderException,
@@ -149,13 +150,17 @@ void toStringType(ref UniNode n) @safe
 
     string getString(UniNode n)
     {
+        bool quotes = n.kind == UniNode.Kind.text;
         n.toStringType;
-        return n.get!string;
+        if (quotes)
+            return "'" ~ n.get!string ~ "'";
+        else
+            return n.get!string;
     }
 
     string doSwitch() @safe
     {
-        switch (n.kind) with (UniNode.Kind)
+        final switch (n.kind) with (UniNode.Kind)
         {
             case nil:      return "";
             case boolean:  return n.get!bool.to!string;
@@ -166,11 +171,11 @@ void toStringType(ref UniNode n) @safe
             case raw:      return n.get!(ubyte[]).to!string;
             case array:    return "["~n.get!(UniNode[]).map!(a => getString(a)).join(", ").to!string~"]";
             case object:
-                string[] results;
+                Tuple!(string, UniNode)[] sorted = [];
                 foreach (key, ref value; n)
-                    results ~= key ~ ": " ~ getString(value);
-                return "{" ~ results.join(", ").to!string ~ "}";
-            default: return "[UnknownObj: %s]".fmt(n.toString);
+                    sorted ~= tuple(key, value);
+                sort!"a[0]<b[0]"(sorted);
+                return "{" ~ sorted.map!(a => a[0]~": "~getString(a[1])).join(", ").to!string ~ "}";
         }
     }
 
@@ -191,7 +196,7 @@ UniNode unary(string op)(UniNode lhs)
                  Operator.Minus)
     )
 {
-    assertJinja(lhs.isIntNode, "Expected int got %s".fmt(lhs.kind));
+    assertJinja(lhs.isNumericNode, "Expected int got %s".fmt(lhs.kind));
 
     if (lhs.isIntNode)
         return UniNode(mixin(op ~ "lhs.get!long"));
@@ -243,12 +248,12 @@ UniNode binary(string op)(UniNode lhs, UniNode rhs)
 
     if (lhs.isIntNode)
     {
-        assertJinja(rhs.get!long != 0, "Divizion by zero!");
+        assertJinja(rhs.get!long != 0, "Division by zero!");
         return UniNode(mixin("lhs.get!long" ~ op ~ "rhs.get!long"));
     }
     else
     {
-        assertJinja(rhs.get!double != 0, "Divizion by zero!");
+        assertJinja(rhs.get!double != 0, "Division by zero!");
         return UniNode(mixin("lhs.get!double" ~ op ~ "rhs.get!double"));
     }
 }

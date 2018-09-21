@@ -7,6 +7,17 @@ license "BSD 3-clause"
 
 dependency "uninode" version="~>0.0.1-beta.2"
 
-targetType "library"
-targetPath "out"
-targetName "djinja"
+configuration "library" {
+    targetType "library"
+    targetPath "out"
+    targetName "djinja"
+}
+
+configuration "unittest" {
+    targetType "library"
+    targetPath "out/tests"
+
+    versions "UnitTestVersion"
+    sourcePaths "tests"
+    importPaths "tests"
+}
