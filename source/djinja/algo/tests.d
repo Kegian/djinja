@@ -14,6 +14,8 @@ Function[string] globalTests()
             "defined":   wrapper!defined,
             "undefined": wrapper!undefined,
             "number":    wrapper!number,
+            "list":      wrapper!list,
+            "dict":      wrapper!dict,
         ];
 }
 
@@ -32,4 +34,14 @@ bool undefined(UniNode value)
 bool number(UniNode value)
 {
     return value.isNumericNode;
+}
+
+bool list(UniNode value)
+{
+    return value.kind == UniNode.Kind.array;
+}
+
+bool dict(UniNode value)
+{
+    return value.kind == UniNode.Kind.object;
 }

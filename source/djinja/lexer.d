@@ -175,6 +175,19 @@ Operator toOperator(string key)
     }
 }
 
+bool isOperator(string key)
+{
+    switch (key) with (Operator)
+    {
+        static foreach(member; EnumMembers!Operator)
+        {
+            case member:
+        }
+                return true;
+        default :
+            return false;
+    }
+}
 
 bool isCmpOperator(Operator op)
 {
@@ -190,6 +203,17 @@ bool isCmpOperator(Operator op)
         );
 }
 
+
+bool isIdentOperator(Operator op)()
+{
+    import std.algorithm : filter;
+    import std.uni : isAlphaNum;
+
+    static if (!(cast(string)op).filter!isAlphaNum.empty)
+        return true;
+    else
+        return false;
+}
 
 
 struct Token
@@ -348,20 +372,16 @@ struct Lexer(
             return Token(Type.StmtBegin, stmtOpInline);
         }
 
-        // Trying to read 'include' kw before 'in' op
-        if (cast(string)Keyword.Include == front(Keyword.Include.length))
-        {
-            skip(Keyword.Include.length);
-            return Token(Type.Keyword, Keyword.Include);
-        }
-
-        // Trying to read operators
+        // Trying to read non-ident operators
         static foreach(op; EnumMembers!Operator)
         {
-            if (cast(string)op == front(op.length))
+            static if (!isIdentOperator!op)
             {
-                skip(op.length);
-                return Token(Type.Operator, op);
+                if (cast(string)op == front(op.length))
+                {
+                    skip(op.length);
+                    return Token(Type.Operator, op);
+                }
             }
         }
 
@@ -382,6 +402,8 @@ struct Lexer(
                     return Token(Type.Keyword, ident);
                 else if (ident.isBoolean)
                     return Token(Type.Boolean, ident);
+                else if (ident.isOperator)
+                    return Token(Type.Operator, ident);
                 else
                     return Token(Type.Ident, ident);
 

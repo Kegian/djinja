@@ -70,7 +70,7 @@ unittest
     assertRender("{{ -2 * 3 }}", "-6");
     assertRender("{{ 10 // 3 }}", "3");
     assertRender("{{ 10 % 3 }}", "1");
-    assertRender("{{ 10 / 3.0 }}", (10/3.0).to!string);
+    assertRender("{{ 10.0 / 3.0 }}", (10.0/3.0).to!string);
 }
 
 
@@ -190,4 +190,47 @@ unittest
     string str = "abcde";
 
     assertRender!(myStrLen, str)("{{ myStrLen( '!' ~ str ~ '!') }}", "7");
+}
+
+
+// Implicity cast to string
+unittest
+{
+    assertRender("{{ '' ~ 123 }}", "123");
+    assertRender("{{ '' ~ 1.5 }}", "1.5");
+    assertRender("{{ '' ~ true }}", "true");
+    assertRender("{{ '' ~ [1,2,3] }}", "[1, 2, 3]");
+    assertRender("{{ '' ~ (1,) }}", "[1]");
+    assertRender("{{ '' ~ {a:1,b:2} }}", "{a: 1, b: 2}");
+}
+
+// Implicity cast to bool
+unittest
+{
+    assertRender("{{ false or -1 }}", "true");
+    assertRender("{{ false or  1 }}", "true");
+    assertRender("{{ false or  0 }}", "false");
+
+    assertRender("{{ false or -1.5 }}", "true");
+    assertRender("{{ false or  1.5 }}", "true");
+    assertRender("{{ false or  0.0 }}", "false");
+
+    assertRender("{{ false or  'str' }}", "true");
+    assertRender("{{ false or  '   ' }}", "true");
+    assertRender("{{ false or  ''    }}", "false");
+
+    assertRender("{{ false or [1,2] }}", "true");
+    assertRender("{{ false or (1,)  }}", "true");
+    assertRender("{{ false or []    }}", "false");
+
+    assertRender("{{ false or {a:1} }}", "true");
+    assertRender("{{ false or {}    }}", "false");
+
+    assertRender("{{ false or undefVar }}", "false");
+}
+
+// Implicity cast integer to float
+unittest
+{
+    assertRender("{{ 1.5 + 15 }}", (16.5).to!string);
 }
