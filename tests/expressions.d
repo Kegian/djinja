@@ -36,7 +36,10 @@ unittest
 
     // Dict
     assertRender("{{ {} }}", "{}");
-    assertRender(`{{ {a:True, 'b':10, "c":"string"} }}`, "{a: true, b: 10, c: 'string'}");
+    assertRender(`{{ {a:10} }}`, "{a: 10}");
+    // can't check print of more than one key due to undefined order:
+    assertRender(`{{ {a:True, 'b':10, "c":"string"} | sort }}`,
+            "[['a', true], ['b', 10], ['c', 'string']]");
 
     // Idents
     struct Dummy
@@ -201,7 +204,7 @@ unittest
     assertRender("{{ '' ~ true }}", "true");
     assertRender("{{ '' ~ [1,2,3] }}", "[1, 2, 3]");
     assertRender("{{ '' ~ (1,) }}", "[1]");
-    assertRender("{{ '' ~ {a:1,b:2} }}", "{a: 1, b: 2}");
+    assertRender("{{ '' ~ {a:1} }}", "{a: 1}");
 }
 
 // Implicity cast to bool

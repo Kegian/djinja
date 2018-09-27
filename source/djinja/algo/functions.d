@@ -16,7 +16,6 @@ Function[string] globalFunctions()
         [
             "range": toDelegate(&range),
             "length": toDelegate(&length),
-            "myRange": wrapper!myRange,
         ];
 }
 
@@ -53,11 +52,4 @@ UniNode length(UniNode params)
 
     assertJinja(0);
     assert(0);
-}
-
-
-auto myRange(long idx, int i, string s = "asd")
-{
-    import std.typecons : tuple;
-    return tuple([idx, i], s); 
 }

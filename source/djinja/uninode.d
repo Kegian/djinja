@@ -171,15 +171,22 @@ void toStringType(ref UniNode n) @safe
             case raw:      return n.get!(ubyte[]).to!string;
             case array:    return "["~n.get!(UniNode[]).map!(a => getString(a)).join(", ").to!string~"]";
             case object:
+                string[] results;
                 Tuple!(string, UniNode)[] sorted = [];
                 foreach (key, ref value; n)
-                    sorted ~= tuple(key, value);
-                sort!"a[0]<b[0]"(sorted);
-                return "{" ~ sorted.map!(a => a[0]~": "~getString(a[1])).join(", ").to!string ~ "}";
+                    results ~= key ~ ": " ~ getString(value);
+                return "{" ~ results.join(", ").to!string ~ "}";
         }
     }
 
     n = UniNode(doSwitch());
+}
+
+
+string getAsString(UniNode n)
+{
+    n.toStringType;
+    return n.get!string;
 }
 
 

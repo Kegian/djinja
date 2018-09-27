@@ -110,15 +110,15 @@ unittest
                 `{% if i is list%}` ~
                     `{{loop(i)}}` ~
                 `{% else %}` ~
-                    `prev: '{{loop.previtem}}', curr: '{{i}}', next: '{{loop.nextitem}}'` ~
+                    `curr: '{{i}}', prev: '{{loop.previtem}}', next: '{{loop.nextitem}}'` ~
                 `{% endif %}` ~
             `{% endfor %}`,
 
-            "prev: '', curr: '1', next: '[3, 4, [5, 6]]'" ~
-            "prev: '', curr: '3', next: '[5, 6]'" ~
-            "prev: '', curr: '5', next: ''" ~
-            "prev: '[3, 4, [5, 6]]', curr: '7', next: '[9]'" ~
-            "prev: '', curr: '9', next: ''"
+            "curr: '1', prev: '', next: '[3, 4, [5, 6]]'" ~
+            "curr: '3', prev: '', next: '[5, 6]'" ~
+            "curr: '5', prev: '', next: ''" ~
+            "curr: '7', prev: '[3, 4, [5, 6]]', next: '[9]'" ~
+            "curr: '9', prev: '', next: ''"
         );
 
     // Check loop.cycle, loop.changed

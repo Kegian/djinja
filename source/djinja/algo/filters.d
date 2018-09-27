@@ -14,6 +14,8 @@ Function[string] globalFilters()
             "default": wrapper!defaultVal,
             "d":       wrapper!defaultVal,
             "upper":   wrapper!upper,
+            "sort":    wrapper!sort,
+            "keys":    wrapper!keys,
         ];
 }
 
@@ -42,4 +44,48 @@ string upper(string str)
 {
     import std.uni : toUpper;
     return str.toUpper;
+}
+
+
+UniNode sort(UniNode value)
+{
+    import std.algorithm : sort;
+
+    switch (value.kind) with (UniNode.Kind)
+    {
+        case array:
+            auto arr = value.get!(UniNode[]);
+            sort!((a, b) => a.getAsString < b.getAsString)(arr);
+            return UniNode(arr);
+
+        case object:
+            UniNode[] arr;
+            foreach (key, val; value)
+            {
+                () @trusted {
+                    arr ~= UniNode([UniNode(key), val]);
+                } ();
+            }
+            sort!"a[0].get!string < b[0].get!string"(arr);
+            return UniNode(arr);
+
+        default:
+            return value;
+    }
+}
+
+
+UniNode keys(UniNode value)
+{
+    if (value.kind != UniNode.Kind.object)
+        return UniNode(null);
+
+    UniNode[] arr;
+    foreach (key, val; value)
+    {
+        () @trusted {
+            arr ~= UniNode(key);
+        } ();
+    }
+    return UniNode(arr);
 }
