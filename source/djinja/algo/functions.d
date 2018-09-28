@@ -7,6 +7,7 @@ private
     import djinja.uninode;
 
     import std.functional : toDelegate;
+    import std.format : fmt = format;
 }
 
 
@@ -15,7 +16,8 @@ Function[string] globalFunctions()
     return cast(immutable)
         [
             "range": toDelegate(&range),
-            "length": toDelegate(&length),
+            "length": wrapper!length,
+            "namespace": wrapper!namespace,
         ];
 }
 
@@ -42,14 +44,23 @@ UniNode range(UniNode params)
 }
 
 
-UniNode length(UniNode params)
+long length(UniNode value)
 {
-    assertJinja(params.kind == UniNode.Kind.object, "Non object params");
-    assertJinja(cast(bool)("varargs" in params), "Missing varargs in params");
-
-    if (params["varargs"].length > 0)
-        return UniNode(cast(long)params["varargs"][0].length);
-
-    assertJinja(0);
+    switch (value.kind) with (UniNode.Kind)
+    {
+        case array:
+        case object:
+            return value.length;
+        case text:
+            return value.get!string.length;
+        default:
+            assertJinja(0, "Object of type `%s` has no length()".fmt(value.kind));
+    }
     assert(0);
+}
+
+
+UniNode namespace(UniNode kwargs)
+{
+    return kwargs;
 }

@@ -493,6 +493,7 @@ class Render : IVisitor
     {
         auto expr = pop();
 
+        // TODO: check flag of set scope
         if (!_context.has(node.name))
         {
             if (node.subIdents.length)

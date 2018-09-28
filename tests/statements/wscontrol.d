@@ -1,1 +1,0 @@
-module tests.statements.wscontrol;
