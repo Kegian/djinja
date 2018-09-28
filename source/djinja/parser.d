@@ -60,6 +60,7 @@ struct Parser(Lexer)
             {
                 bool stripR = false;
                 bool stripL = false;
+                bool stripInlineR = false;
 
                 if (i >= 2 
                     && _tokens[i-2] == Operator.Minus
@@ -67,15 +68,18 @@ struct Parser(Lexer)
                     )
                     stripL = true;
 
-                if (i < _tokens.length - 2 
-                    && _tokens[i+1] == Type.StmtBegin
-                    && _tokens[i+2] == Operator.Minus
-                    )
-                    stripR = true;
+                if (i < _tokens.length - 2 && _tokens[i+1] == Type.StmtBegin)
+                {
+                    if (_tokens[i+2] == Operator.Minus)
+                        stripR = true;
+                    else if (_tokens[i+1].value == Lexer.stmtInline)
+                        stripInlineR = true;
+                }
 
                 auto str = _tokens[i].value;
                 str = stripR ? str.stripRight : str;
                 str = stripL ? str.stripLeft : str;
+                str = stripInlineR ? str.stripOnceRight : str;
                 newTokens.put(Token(Type.Raw, str));
                 i++;
             }
@@ -1213,4 +1217,23 @@ string absolute(string path)
 {
     //TODO
     return path;
+}
+
+
+string stripOnceRight(string str)
+{
+    import std.uni;
+    import std.utf : codeLength;
+
+    import std.traits;
+    alias C = Unqual!(ElementEncodingType!string);
+
+    bool stripped = false;
+    foreach_reverse (i, dchar c; str)
+    {
+        if (!isWhite(c) || c == '\n')
+            return str[0 .. i + codeLength!C(c)];
+    }
+
+    return str[0 .. 0];
 }

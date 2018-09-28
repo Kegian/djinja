@@ -267,7 +267,8 @@ struct Lexer(
 
     //TODO check uniq
 
-    
+
+    enum stmtInline = stmtOpInline;
     enum EOF = 255;
 
     private
@@ -358,7 +359,7 @@ struct Lexer(
             return Token(Type.CmntEnd, cmntOpEnd);
         }
 
-        // Check begin online operators
+        // Check begin inline operators
         if (cmntOpInline == front(cmntOpInline.length))
         {
             skipInlineComment();
