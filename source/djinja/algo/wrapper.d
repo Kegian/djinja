@@ -80,14 +80,14 @@ template wrapper(alias F)
                         filled[ParameterIdents[i]] = true;
                     }
                     else
-                        varargs.appendArrayElement(params["varargs"][i]);
+                        varargs ~= params["varargs"][i];
                     varargsFilled++;
                 }
             }
             // Filled missed varargs
             if (varargsFilled < params["varargs"].length)
                 foreach(i; varargsFilled .. params["varargs"].length)
-                    varargs.appendArrayElement(params["varargs"][i]);
+                    varargs ~= params["varargs"][i];
 
             bool[string] kwargsFilled;
             static foreach(i, key; ParameterIdents)
@@ -100,13 +100,11 @@ template wrapper(alias F)
                 }
             }
             // Filled missed kwargs
-            () @safe  {
-                foreach (key, val; params["kwargs"])
-                {
-                    if (key !in kwargsFilled)
-                        kwargs[key] = val;
-                }
-            } ();
+            foreach (string key, ref UniNode val; params["kwargs"])
+            {
+                if (key !in kwargsFilled)
+                    kwargs[key] = val;
+            }
 
             // Fill varargs/kwargs
             foreach(i, key; ParameterIdents)

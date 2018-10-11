@@ -167,8 +167,8 @@ unittest
     assertRender("{{ 'a' not is number}}", "true");
 
     assertRender("{{ 'string'|upper }}", "STRING");
+    assertRender("{{ undefinedVar | d | upper }}", "");
     assertRender("{{ undefinedVar | d('undefined') | upper }}", "UNDEFINED");
-
     assertRender("{{ 1 ~ (1>2) ~ 'str' ~ [1] }}", "1falsestr[1]");
     assertRender("{{ 1 ~  1>2  ~ 'str' ~ [1] }}", "false");
 

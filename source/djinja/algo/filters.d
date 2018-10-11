@@ -20,12 +20,8 @@ Function[string] globalFilters()
 }
 
 
-UniNode defaultVal(UniNode value, UniNode default_value = UniNode(null), bool boolean = false)
+UniNode defaultVal(UniNode value, UniNode default_value = UniNode(""), bool boolean = false)
 {
-    //TODO fix
-    if (default_value.kind == UniNode.Kind.nil)
-        default_value = UniNode("");
-
     if (value.kind == UniNode.Kind.nil)
         return default_value;
 
@@ -60,12 +56,8 @@ UniNode sort(UniNode value)
 
         case object:
             UniNode[] arr;
-            foreach (key, val; value)
-            {
-                () @trusted {
-                    arr ~= UniNode([UniNode(key), val]);
-                } ();
-            }
+            foreach (string key, val; value)
+                arr ~= UniNode([UniNode(key), val]);
             sort!"a[0].get!string < b[0].get!string"(arr);
             return UniNode(arr);
 
@@ -81,11 +73,7 @@ UniNode keys(UniNode value)
         return UniNode(null);
 
     UniNode[] arr;
-    foreach (key, val; value)
-    {
-        () @trusted {
-            arr ~= UniNode(key);
-        } ();
-    }
+    foreach (string key, val; value)
+        arr ~= UniNode(key);
     return UniNode(arr);
 }

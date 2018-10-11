@@ -21,7 +21,7 @@ unittest
     assertRender(`
         {%- macro bubbleSort(l) %}
             {%- for i in l.length.range %}
-                {%- for j in range(l.length - (i + 1)) %}
+                {%- for j in range(l.length - i - 1) %}
                     {%- if l[j] > l[j + 1]%}
                         {%- set l[j], l[j+1] = l[j+1], l[j] %}
                     {%- endif %}            
@@ -41,7 +41,7 @@ unittest
     assertRender(
 `        # macro bubbleSort(l)
             # for i in l.length.range
-                # for j in range(l.length - (i + 1))
+                # for j in range(l.length - i - 1)
                     # if l[j] > l[j + 1]
                         # set l[j], l[j+1] = l[j+1], l[j]
                     # endif

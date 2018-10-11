@@ -56,25 +56,19 @@ bool isIterableNode(ref UniNode n)
         );
 }
 
-void toIterableNode(ref UniNode n) @safe
+void toIterableNode(ref UniNode n)
 {
     switch (n.kind) with (UniNode.Kind)
     {
         case array:
             return;
         case text:
-            () @trusted {
-                n = UniNode(n.get!string.map!(a => UniNode(cast(string)[a])).array);
-            } ();
+            n = UniNode(n.get!string.map!(a => UniNode(cast(string)[a])).array);
             return;
         case object:
             UniNode[] arr;
             foreach (key, val; n.get!(UniNode[string]))
-            {
-                () @trusted {
-                    arr ~= UniNode([UniNode(key), val]);
-                } ();
-            }
+                arr ~= UniNode([UniNode(key), val]);
             n = UniNode(arr);
             return;
         default:
@@ -143,7 +137,7 @@ void toBoolType(ref UniNode n)
 }
 
 
-void toStringType(ref UniNode n) @safe
+void toStringType(ref UniNode n)
 {
     import std.algorithm : map;
     import std.string : join;
@@ -158,7 +152,7 @@ void toStringType(ref UniNode n) @safe
             return n.get!string;
     }
 
-    string doSwitch() @safe
+    string doSwitch()
     {
         final switch (n.kind) with (UniNode.Kind)
         {
@@ -173,7 +167,7 @@ void toStringType(ref UniNode n) @safe
             case object:
                 string[] results;
                 Tuple!(string, UniNode)[] sorted = [];
-                foreach (key, ref value; n)
+                foreach (string key, ref value; n)
                     results ~= key ~ ": " ~ getString(value);
                 return "{" ~ results.join(", ").to!string ~ "}";
         }
@@ -190,7 +184,7 @@ string getAsString(UniNode n)
 }
 
 
-void checkNodeType(ref UniNode n, UniNode.Kind kind) @safe
+void checkNodeType(ref UniNode n, UniNode.Kind kind)
 {
     if (n.kind != kind)
         throw new JinjaRenderException("Unexpected expression type %s, expcted %s".fmt(n.kind, kind));

@@ -617,17 +617,15 @@ class Render : IVisitor
         bool iterated = false;
         int depth = 0; 
 
-        bool calcCondition() @safe
+        bool calcCondition()
         {
             bool condition = true;
             if (!node.cond.isNull)
             {
-                () @trusted {
-                    tryAccept(node.cond);
-                    auto cond = pop();
-                    cond.toBoolType;
-                    condition = cond.get!bool;
-                } ();
+                tryAccept(node.cond);
+                auto cond = pop();
+                cond.toBoolType;
+                condition = cond.get!bool;
             }
             return condition;
         }
@@ -672,7 +670,7 @@ class Render : IVisitor
                     }
 
                     if (calcCondition())
-                        newIterable.appendArrayElement(iterable[i]);
+                        newIterable ~= iterable[i];
                 }
                 iterable = newIterable;
             }
@@ -906,15 +904,13 @@ private:
                 varargs ~= args["varargs"][i];
         }
 
-        //TODO to foreach after uninode fix
-        args["kwargs"].opApply(delegate(ref string key, ref UniNode value) @safe
-                {
-                    if (macro_.args.has(key))
-                        _context.data[key] = value;
-                    else
-                        kwargs[key] = value;
-                    return cast(int)0;
-                });
+        foreach (string key, value; args["kwargs"])
+        {
+            if (macro_.args.has(key))
+                _context.data[key] = value;
+            else
+                kwargs[key] = value;
+        }
 
         _context.data["varargs"] = UniNode(varargs);
         _context.data["kwargs"] = UniNode(kwargs);
@@ -1031,7 +1027,7 @@ void registerFunction(alias func)(Render render)
 private:
 
 
-bool has(FormArg[] arr, string name) @safe
+bool has(FormArg[] arr, string name)
 {
     foreach(a; arr)
         if (a.name == name)
