@@ -5,7 +5,10 @@ private
 {
     import djinja.exception : JinjaException;
 
+    import std.conv : to;
     import std.traits : EnumMembers;
+    import std.utf;
+    import std.range;
 }
 
 
@@ -216,6 +219,13 @@ bool isIdentOperator(Operator op)()
 }
 
 
+struct TokenPos
+{
+    string filename;
+    ulong line, column;
+}
+
+
 struct Token
 {
     Type type;
@@ -273,16 +283,19 @@ struct Lexer(
 
     private
     {
-        bool _isReadingRaw;
-        bool _isInlineStmt;
+        bool _isReadingRaw; // State of reading raw data
+        bool _isInlineStmt; // State of reading inline statement
         string _str;
+        string _filename;
+        ulong _line, _column;
     }
 
-    this(string str)
+    this(string str, string filename = "")
     {
         _str = str;
         _isReadingRaw = true;
         _isInlineStmt = false;
+        _filename = filename;
     }
 
     Token nextToken()
@@ -299,40 +312,40 @@ struct Lexer(
         skipWhitespaces();
 
         // Check inline statement end
-        if (_isInlineStmt && front == '\n')
+        if (_isInlineStmt && tryToSkipNewLine())
         {
             _isInlineStmt = false;
             _isReadingRaw = true;
-            return Token(Type.StmtEnd, [pop]);
+            return Token(Type.StmtEnd, "\n");
         }
 
         // Allow multiline inline statements with '\'
         while (true)
         {
-            if (_isInlineStmt && front(2) == "\\\n")
-                skip(2);
-            else if (_isInlineStmt && front(3) == "\\\r\n")
-                skip(3);
+            if (_isInlineStmt && front == '\\')
+            {
+                pop();
+                if (!tryToSkipNewLine())
+                    return Token(Type.Unknown, "\\");
+            }
             else
                 break;
 
             skipWhitespaces();
         }
 
-
-
         // Check begin operators
-        if (exprOpBegin == front(exprOpBegin.length))
+        if (exprOpBegin == slice(exprOpBegin.length))
         {
             skip(exprOpBegin.length);
             return Token(Type.ExprBegin, exprOpBegin);
         }
-        if (stmtOpBegin == front(stmtOpBegin.length))
+        if (stmtOpBegin == slice(stmtOpBegin.length))
         {
             skip(stmtOpBegin.length);
             return Token(Type.StmtBegin, stmtOpBegin);
         }
-        if (cmntOpBegin == front(cmntOpBegin.length))
+        if (cmntOpBegin == slice(cmntOpBegin.length))
         {
             skip(cmntOpBegin.length);
             skipComment();
@@ -340,19 +353,19 @@ struct Lexer(
         }
 
         // Check end operators
-        if (exprOpEnd == front(exprOpEnd.length))
+        if (exprOpEnd == slice(exprOpEnd.length))
         {
             _isReadingRaw = true;
             skip(exprOpEnd.length);
             return Token(Type.ExprEnd, exprOpEnd);
         }
-        if (stmtOpEnd == front(stmtOpEnd.length))
+        if (stmtOpEnd == slice(stmtOpEnd.length))
         {
             _isReadingRaw = true;
             skip(stmtOpEnd.length);
             return Token(Type.StmtEnd, stmtOpEnd);
         }
-        if (cmntOpEnd == front(cmntOpEnd.length))
+        if (cmntOpEnd == slice(cmntOpEnd.length))
         {
             _isReadingRaw = true;
             skip(cmntOpEnd.length);
@@ -360,13 +373,13 @@ struct Lexer(
         }
 
         // Check begin inline operators
-        if (cmntOpInline == front(cmntOpInline.length))
+        if (cmntOpInline == slice(cmntOpInline.length))
         {
             skipInlineComment();
             _isReadingRaw = true;
             return Token(Type.CmntInline);
         }
-        if (stmtOpInline == front(stmtOpInline.length))
+        if (stmtOpInline == slice(stmtOpInline.length))
         {
             skip(stmtOpInline.length);
             _isInlineStmt = true;
@@ -378,7 +391,7 @@ struct Lexer(
         {
             static if (!isIdentOperator!op)
             {
-                if (cast(string)op == front(op.length))
+                if (cast(string)op == slice(op.length))
                 {
                     skip(op.length);
                     return Token(Type.Operator, op);
@@ -417,18 +430,18 @@ struct Lexer(
             case '\'':
                 return Token(Type.String, popString());
                 
-            case '(': return Token(Type.LParen, [pop]);
-            case ')': return Token(Type.RParen, [pop]);
-            case '[': return Token(Type.LSParen, [pop]);
-            case ']': return Token(Type.RSParen, [pop]);
-            case '{': return Token(Type.LBrace, [pop]);
-            case '}': return Token(Type.RBrace, [pop]);
-            case '.': return Token(Type.Dot, [pop]);
-            case ',': return Token(Type.Comma, [pop]);
-            case ':': return Token(Type.Colon, [pop]);
+            case '(': return Token(Type.LParen, popChar);
+            case ')': return Token(Type.RParen, popChar);
+            case '[': return Token(Type.LSParen, popChar);
+            case ']': return Token(Type.RSParen, popChar);
+            case '{': return Token(Type.LBrace, popChar);
+            case '}': return Token(Type.RBrace, popChar);
+            case '.': return Token(Type.Dot, popChar);
+            case ',': return Token(Type.Comma, popChar);
+            case ':': return Token(Type.Colon, popChar);
 
             default:
-                return Token(Type.Unknown, [pop]);
+                return Token(Type.Unknown, popChar);
         }
     }
 
@@ -436,16 +449,43 @@ struct Lexer(
 private:
 
 
-    char front()
+    dchar front()
     {
         if (_str.length > 0)
-            return _str[0];
+            return _str.front;
         else
             return EOF;
     }
 
 
-    string front(uint num)
+    dchar next()
+    {
+        auto chars = _str.take(2).array;
+        if (chars.length < 2)
+            return EOF;
+        return chars[1];
+    }
+
+    dchar pop()
+    {
+        if (_str.length > 0)
+        {
+            auto prev  = _str.front;
+            _str.popFront();
+            return prev;
+        } 
+        else
+            return EOF;
+    }
+
+
+    string popChar()
+    {
+        return pop.to!string;
+    }
+
+
+    string slice(uint num)
     {
         if (num >= _str.length)
             return _str;
@@ -453,26 +493,6 @@ private:
             return _str[0 .. num];
     }
 
-
-    char next()
-    {
-        if (_str.length > 1)
-            return _str[1];
-        else
-            return EOF;
-    }
-
-    char pop()
-    {
-        if (_str.length > 0)
-        {
-            auto prev  = _str[0];
-            _str = _str[1 .. $];
-            return prev;
-        } 
-        else
-            return EOF;
-    }
 
     void skip(uint num)
     {
@@ -483,25 +503,32 @@ private:
     }
 
 
+    TokenPos position()
+    {
+        return TokenPos(_filename, _line, _column);
+    }
+
+
     void skipWhitespaces()
     {
         while (true)
         {
-            switch (front)
+            if (front.isWhiteSpace)
             {
-                case ' ':
-                case '\t':
-                case '\r':
-                    pop();
-                    break;
-                case '\n':
-                    if (_isInlineStmt)
-                        return;
-                    pop();
-                    break;
-                default:
-                    return;
+                pop();
+                continue;
             }
+
+            if (isFronNewLine)
+            {
+                // Return for handling NL as StmtEnd
+                if (_isInlineStmt)
+                    return;
+                tryToSkipNewLine();
+                continue;
+            }
+
+            return;
         }
     }
 
@@ -589,15 +616,15 @@ private:
             if (front == EOF)
                 return raw;
 
-            if (exprOpBegin == front(exprOpBegin.length))
+            if (exprOpBegin == slice(exprOpBegin.length))
                 return raw;
-            if (stmtOpBegin == front(stmtOpBegin.length))
+            if (stmtOpBegin == slice(stmtOpBegin.length))
                 return raw;
-            if (cmntOpBegin == front(cmntOpBegin.length))
+            if (cmntOpBegin == slice(cmntOpBegin.length))
                 return raw;
-            if (stmtOpInline == front(stmtOpInline.length))
+            if (stmtOpInline == slice(stmtOpInline.length))
                 return raw;
-            if (cmntOpInline == front(cmntOpInline.length))
+            if (cmntOpInline == slice(cmntOpInline.length))
                 return raw;
             
             raw ~= pop();
@@ -609,7 +636,7 @@ private:
     {
         while(front != EOF)
         {
-            if (cmntOpEnd == front(cmntOpEnd.length))
+            if (cmntOpEnd == slice(cmntOpEnd.length))
                 return;
             pop();
         }
@@ -628,4 +655,40 @@ private:
             pop();
         }
     }
+
+
+    bool isFronNewLine()
+    {
+        auto ch = front;
+        return ch == '\r' || ch == '\n' || ch == 0x2028 || ch == 0x2029; 
+    }
+
+    /// true if NL was skiped
+    bool tryToSkipNewLine()
+    {
+        switch (front)
+        {
+            case '\r':
+                pop();
+                if (front == '\n')
+                    pop();
+                return true;
+
+            case '\n':
+            case 0x2028:
+            case 0x2029:
+                pop();
+                return true;
+
+            default:
+                return false;
+        }
+    }
+}
+
+
+bool isWhiteSpace(dchar ch)
+{
+    return ch == ' ' || ch == '\t' || ch == 0x205F || ch == 0x202F || ch == 0x3000
+           || ch == 0x00A0 || (ch >= 0x2002 && ch <= 0x200B);
 }
