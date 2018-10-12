@@ -184,10 +184,10 @@ string getAsString(UniNode n)
 }
 
 
-void checkNodeType(ref UniNode n, UniNode.Kind kind)
+void checkNodeType(ref UniNode n, UniNode.Kind kind, Position pos)
 {
     if (n.kind != kind)
-        throw new JinjaRenderException("Unexpected expression type %s, expcted %s".fmt(n.kind, kind));
+        assertJinja(0, "Unexpected expression type `%s`, expected `%s`".fmt(n.kind, kind), pos);
 }
 
 

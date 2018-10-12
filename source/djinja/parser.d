@@ -1,5 +1,10 @@
 module djinja.parser;
 
+public
+{
+    import djinja.lexer : Position;
+}
+
 private
 {
     import std.array : appender;
@@ -80,7 +85,7 @@ struct Parser(Lexer)
                 str = stripR ? str.stripRight : str;
                 str = stripL ? str.stripLeft : str;
                 str = stripInlineR ? str.stripOnceRight : str;
-                newTokens.put(Token(Type.Raw, str));
+                newTokens.put(Token(Type.Raw, str, _tokens[i].pos));
                 i++;
             }
             else
@@ -93,11 +98,11 @@ struct Parser(Lexer)
     }
 
 
-    TemplateNode parseTree(string str)
+    TemplateNode parseTree(string str, string filename = "main")
     {
         stashState();
 
-        auto lexer = Lexer(str);
+        auto lexer = Lexer(str, filename);
         auto newTokens = appender!(Token[]);
 
         while (true)
@@ -115,11 +120,11 @@ struct Parser(Lexer)
         auto blocks = _blocks;
 
         if (front.type != Type.EOF)
-            throw new JinjaParserException("Expected EOF found %s(%s)".fmt(front.type, front.value));
+            assertJinja(0, "Expected EOF found %s(%s)".fmt(front.type, front.value), front.pos);
 
         popState();
 
-        return new TemplateNode(root, blocks);
+        return new TemplateNode(Position(filename, 1, 1), root, blocks);
     }
 
 
@@ -130,7 +135,7 @@ struct Parser(Lexer)
         if (auto cached = path in _parsedFiles)
         {
             if (*cached is null)
-                throw new JinjaParserException("Recursive imports/includes/extends not allowed");
+                assertJinja(0, "Recursive imports/includes/extends not allowed: ".fmt(path), front.pos);
             else
                 return *cached;
         }
@@ -153,26 +158,28 @@ private:
     ExprNode parseExpression()
     {
         Node expr;
+        auto pos = front.pos;
 
         pop(Type.ExprBegin);
         expr = parseHighLevelExpression();
         pop(Type.ExprEnd);
 
-        return new ExprNode(expr);
+        return new ExprNode(pos, expr);
     }
 
     StmtBlockNode parseStatementBlock()
     {
-        auto block = new StmtBlockNode();
+        auto block = new StmtBlockNode(front.pos);
 
         while (front.type != Type.EOF)
         {
+            auto pos = front.pos;
             switch(front.type) with (Type)
             {
                 case Raw:
                     auto raw = pop.value;
                     if (raw.length)
-                        block.children ~= new RawNode(raw);
+                        block.children ~= new RawNode(pos, raw);
                     break;
 
                 case ExprBegin:
@@ -196,8 +203,6 @@ private:
                     break;
 
                 default:
-                    import std.stdio: wl = writeln;
-                    wl("???? ", front);
                     return block;
             }
         }
@@ -239,6 +244,7 @@ private:
         string[] keys;
         bool isRecursive = false;
         Node cond = null;
+        auto pos = front.pos;
 
         pop(Keyword.For);
 
@@ -284,7 +290,7 @@ private:
             case EndFor:
                 pop(Keyword.EndFor);
                 pop(Type.StmtEnd);
-                return new ForNode(keys, iterable, block, null, cond, isRecursive);
+                return new ForNode(pos, keys, iterable, block, null, cond, isRecursive);
             case Else:
                 pop(Keyword.Else);
                 pop(Type.StmtEnd);
@@ -292,16 +298,18 @@ private:
                 pop(Type.StmtBegin);
                 pop(Keyword.EndFor);
                 pop(Type.StmtEnd);
-                return new ForNode(keys, iterable, block, other, cond, isRecursive);
+                return new ForNode(pos, keys, iterable, block, other, cond, isRecursive);
             default:
-                throw new JinjaParserException("Unexpected token %s".fmt(front.value));
+                assertJinja(0, "Unexpected token %s(%s)".fmt(front.type, front.value), front.pos);
+                assert(0);
         }
     }
 
 
     IfNode parseIf()
     {
-        assertJinja(front == Keyword.If || front == Keyword.ElIf);
+        auto pos = front.pos;
+        assertJinja(front == Keyword.If || front == Keyword.ElIf, "Expected If/Elif", pos);
         pop();
         auto cond = parseHighLevelExpression();
         pop(Type.StmtEnd);
@@ -314,40 +322,45 @@ private:
         {
             case ElIf:
                 auto other = parseIf();
-                return new IfNode(cond, then, other);
+                return new IfNode(pos, cond, then, other);
             case Else:
                 pop(Keyword.Else, Type.StmtEnd);
                 auto other = parseStatementBlock();
                 pop(Type.StmtBegin, Keyword.EndIf, Type.StmtEnd);
-                return new IfNode(cond, then, other);
+                return new IfNode(pos, cond, then, other);
             case EndIf:
                 pop(Keyword.EndIf, Type.StmtEnd);
-                return new IfNode(cond, then, null);
+                return new IfNode(pos, cond, then, null);
             default:
-                throw new JinjaParserException("Enexppected token %s".fmt(front.value));
+                assertJinja(0, "Unexpected token %s(%s)".fmt(front.type, front.value), front.pos);
+                assert(0);
         }
     }
 
 
     SetNode parseSet()
     {
+        auto setPos = front.pos;
+
         pop(Keyword.Set);
 
         auto assigns = parseSequenceOf!parseAssignable(Type.Operator);
 
         pop(Operator.Assign);
 
+        auto listPos = front.pos;
         auto exprs = parseSequenceOf!parseHighLevelExpression(Type.StmtEnd);
-        Node expr = exprs.length == 1 ? exprs[0] : new ListNode(exprs);
+        Node expr = exprs.length == 1 ? exprs[0] : new ListNode(listPos, exprs);
 
         pop(Type.StmtEnd);
 
-        return new SetNode(assigns, expr);
+        return new SetNode(setPos, assigns, expr);
     }
 
 
     AssignableNode parseAssignable()
     {
+        auto pos = front.pos;
         string name = pop(Type.Ident).value;
         Node[] subIdents = [];
 
@@ -357,7 +370,8 @@ private:
             {
                 case Dot:
                     pop(Dot);
-                    subIdents ~= new StringNode(pop(Ident).value);
+                    auto strPos = front.pos;
+                    subIdents ~= new StringNode(strPos, pop(Ident).value);
                     break;
                 case LSParen:
                     pop(LSParen);
@@ -365,7 +379,7 @@ private:
                     pop(RSParen);
                     break;
                 default:
-                    return new AssignableNode(name, subIdents);
+                    return new AssignableNode(pos, name, subIdents);
             }
         }
     }
@@ -373,6 +387,7 @@ private:
 
     MacroNode parseMacro()
     {
+        auto pos = front.pos;
         pop(Keyword.Macro);
 
         auto name = pop(Type.Ident).value;
@@ -399,16 +414,17 @@ private:
             ret = true;
         }
         else
-            block.children ~= new NilNode;
+            block.children ~= new NilNode; // void return
 
         pop(Type.StmtEnd);
 
-        return new MacroNode(name, args, block, ret);
+        return new MacroNode(pos, name, args, block, ret);
     }
 
     
     CallNode parseCall()
     {
+        auto pos = front.pos;
         pop(Keyword.Call);
         
         Arg[] formalArgs;
@@ -426,16 +442,17 @@ private:
         pop(Type.StmtEnd);
 
         auto block = parseStatementBlock();
-        block.children ~= new StringNode("");
+        block.children ~= new NilNode; // void return
 
         pop(Type.StmtBegin, Keyword.EndCall, Type.StmtEnd);
 
-        return new CallNode(macroName, formalArgs, factArgs, block);
+        return new CallNode(pos, macroName, formalArgs, factArgs, block);
     }
 
 
     FilterBlockNode parseFilterBlock()
     {
+        auto pos = front.pos;
         pop(Keyword.Filter);
 
         auto filterName = front.value;
@@ -447,7 +464,7 @@ private:
 
         pop(Type.StmtBegin, Keyword.EndFilter, Type.StmtEnd);
 
-        return new FilterBlockNode(filterName, args, block);
+        return new FilterBlockNode(pos, filterName, args, block);
     }
     
 
@@ -463,6 +480,7 @@ private:
 
     ImportNode parseImport()
     {
+        auto pos = front.pos;
         pop(Keyword.Import);
         auto path = pop(Type.String).value.absolute;
         bool withContext = false;
@@ -481,16 +499,17 @@ private:
 
         pop(Type.StmtEnd);
 
-        assertJinja(path.exists, "Non existing file `%s`".fmt(path));
+        assertJinja(path.exists, "Non existing file `%s`".fmt(path), pos);
         
         auto stmtBlock = parseTreeFromFile(path);
         
-        return new ImportNode(path, cast(ImportNode.Rename[])[], stmtBlock, withContext);
+        return new ImportNode(pos, path, cast(ImportNode.Rename[])[], stmtBlock, withContext);
     }
 
 
     ImportNode parseImportFrom()
     {
+        auto pos = front.pos;
         pop(Keyword.From);
         auto path = pop(Type.String).value.absolute;
         pop(Keyword.Import);
@@ -533,17 +552,17 @@ private:
 
         pop(Type.StmtEnd);
 
-        assertJinja(path.exists, "Non existing file `%s`".fmt(path));
+        assertJinja(path.exists, "Non existing file `%s`".fmt(path), pos);
         
         auto stmtBlock = parseTreeFromFile(path);
         
-        return new ImportNode(path, macros, stmtBlock, withContext);
+        return new ImportNode(pos, path, macros, stmtBlock, withContext);
     }
 
 
     IncludeNode parseInclude()
     {
-        import std.stdio: wl = writeln;
+        auto pos = front.pos;
         pop(Keyword.Include);
 
         string[] names;
@@ -590,30 +609,32 @@ private:
 
         foreach (name; names)
             if (name.exists)
-                return new IncludeNode(name, parseTreeFromFile(name), withContext);
+                return new IncludeNode(pos, name, parseTreeFromFile(name), withContext);
  
-        assertJinja(ignoreMissing, "No existing files `%s`".fmt(names));
+        assertJinja(ignoreMissing, "No existing files `%s`".fmt(names), pos);
         
-        return new IncludeNode("", null, withContext);
+        return new IncludeNode(pos, "", null, withContext);
     }
 
 
     ExtendsNode parseExtends()
     {
+        auto pos = front.pos;
         pop(Keyword.Extends);
         auto path = pop(Type.String).value.absolute;
         pop(Type.StmtEnd);
 
-        assertJinja(path.exists, "Non existing file `%s`".fmt(path));
+        assertJinja(path.exists, "Non existing file `%s`".fmt(path), pos);
         
         auto stmtBlock = parseTreeFromFile(path);
         
-        return new ExtendsNode(path, stmtBlock);
+        return new ExtendsNode(pos, path, stmtBlock);
     }
 
 
     BlockNode parseBlock()
     {
+        auto pos = front.pos;
         pop(Keyword.Block);
         auto name = pop(Type.Ident).value;
         pop(Type.StmtEnd);
@@ -622,12 +643,13 @@ private:
 
         pop(Type.StmtBegin, Keyword.EndBlock);
 
+        auto posNameEnd = front.pos;
         if (front == Type.Ident)
-            assertJinja(pop.value == name, "Missmatching block's begin/end names");
+            assertJinja(pop.value == name, "Missmatching block's begin/end names", posNameEnd);
 
         pop(Type.StmtEnd);
 
-        return new BlockNode(name, stmt);
+        return new BlockNode(pos, name, stmt);
     }
 
     Arg[] parseFormalArgs()
@@ -671,6 +693,7 @@ private:
         Node cond = null;
         Node other = null;
 
+        auto pos = front.pos;
         expr = parseOrExpr();
 
         if (front == Keyword.If)
@@ -684,7 +707,7 @@ private:
                 other = parseOrExpr();
             }
 
-            return new InlineIfNode(expr, cond, other);
+            return new InlineIfNode(pos, expr, cond, other);
         }
 
         return expr;
@@ -702,9 +725,10 @@ private:
         {
             if (front.type == Type.Operator && front.value == Operator.Or)
             {
+                auto pos = front.pos;
                 pop(Operator.Or);
                 auto rhs = parseAndExpr();
-                lhs = new BinOpNode(Operator.Or, lhs, rhs);
+                lhs = new BinOpNode(pos, Operator.Or, lhs, rhs);
             }
             else
                 return lhs;
@@ -723,9 +747,10 @@ private:
         {
             if (front.type == Type.Operator && front.value == Operator.And)
             {
+                auto pos = front.pos;
                 pop(Operator.And);
                 auto rhs = parseInIsExpr();
-                lhs = new BinOpNode(Operator.And, lhs, rhs);
+                lhs = new BinOpNode(pos, Operator.And, lhs, rhs);
             }
             else
                 return lhs;
@@ -740,6 +765,7 @@ private:
     {
         auto inis = parseCmpExpr();
 
+        auto notPos = front.pos;
         bool hasNot = false;
         if (front == Operator.Not && (next == Operator.In || next == Operator.Is))
         {
@@ -747,22 +773,24 @@ private:
             hasNot = true;
         }
 
+        auto inisPos = front.pos;
+
         if (front == Operator.In)
         {
             auto op = pop().value;
             auto rhs = parseHighLevelExpression();
-            inis = new BinOpNode(op, inis, rhs);
+            inis = new BinOpNode(inisPos, op, inis, rhs);
         }
 
         if (front == Operator.Is)
         {
             auto op = pop().value;
             auto rhs = parseCallExpr();
-            inis = new BinOpNode(op, inis, rhs);
+            inis = new BinOpNode(inisPos, op, inis, rhs);
         }
 
         if (hasNot)
-            inis = new UnaryOpNode(Operator.Not, inis);
+            inis = new UnaryOpNode(notPos, Operator.Not, inis);
 
         return inis;
     }
@@ -778,8 +806,9 @@ private:
 
         if (front.type == Type.Operator && front.value.toOperator.isCmpOperator)
         {
+            auto pos = front.pos;
             auto op = pop(Type.Operator).value;
-            return new BinOpNode(op, lhs, parseConcatExpr());
+            return new BinOpNode(pos, op, lhs, parseConcatExpr());
         }
 
         return lhs;
@@ -795,8 +824,9 @@ private:
 
         while (front == Operator.Concat)
         {
+            auto pos = front.pos;
             auto op = pop(Operator.Concat).value;
-            lhsTerm = new BinOpNode(op, lhsTerm, parseFilterExpr());
+            lhsTerm = new BinOpNode(pos, op, lhsTerm, parseFilterExpr());
         }
 
         return lhsTerm;
@@ -811,8 +841,9 @@ private:
 
         while (front == Operator.Filter)
         {
+            auto pos = front.pos;
             auto op = pop(Operator.Filter).value;
-            filterexpr = new BinOpNode(op, filterexpr, parseCallExpr());
+            filterexpr = new BinOpNode(pos, op, filterexpr, parseCallExpr());
         }
 
         return filterexpr;
@@ -831,12 +862,13 @@ private:
             if (front.type != Type.Operator)
                 return lhsTerm;
 
+            auto pos = front.pos;
             switch (front.value) with (Operator)
             {
                 case Plus:
                 case Minus:
                     auto op = pop.value;
-                    lhsTerm = new BinOpNode(op, lhsTerm, parseTerm());
+                    lhsTerm = new BinOpNode(pos, op, lhsTerm, parseTerm());
                     break;
                 default:
                     return lhsTerm;
@@ -857,6 +889,7 @@ private:
             if (front.type != Type.Operator)
                 return lhsFactor;
         
+            auto pos = front.pos;
             switch (front.value) with (Operator)
             {
                 case DivInt:
@@ -864,7 +897,7 @@ private:
                 case Mul:
                 case Rem:
                     auto op = pop.value;
-                    lhsFactor = new BinOpNode(op, lhsFactor, parseUnary());
+                    lhsFactor = new BinOpNode(pos, op, lhsFactor, parseUnary());
                     break;
                 default:
                     return lhsFactor;
@@ -881,15 +914,16 @@ private:
         if (front.type != Type.Operator)
             return parsePow();
 
+        auto pos = front.pos;
         switch (front.value) with (Operator)
         {
             case Plus:
             case Minus:
             case Not:
                 auto op = pop.value;
-                return new UnaryOpNode(op, parseUnary());
+                return new UnaryOpNode(pos, op, parseUnary());
             default:
-                assertJinja(0, "Unexpected operator `%s`".fmt(front.value));
+                assertJinja(0, "Unexpected operator `%s`".fmt(front.value), front.pos);
                 assert(0);
         }
     }
@@ -904,8 +938,9 @@ private:
 
         if (front.type == Type.Operator && front.value == Operator.Pow)
         {
+            auto pos = front.pos;
             auto op = pop(Operator.Pow).value;
-            return new BinOpNode(op, lhs, parsePow());
+            return new BinOpNode(pos, op, lhs, parsePow());
         }
 
         return lhs;
@@ -924,11 +959,12 @@ private:
                 return parseIdent();
 
             case LParen:
+                auto pos = front.pos;
                 pop(LParen);
                 bool hasCommas;
                 auto exprList = parseSequenceOf!parseHighLevelExpression(RParen, hasCommas);
                 pop(RParen);
-                return hasCommas ? new ListNode(exprList) : exprList[0];
+                return hasCommas ? new ListNode(pos, exprList) : exprList[0];
 
             default:
                 return parseLiteral();
@@ -943,6 +979,7 @@ private:
     {
         string name = "";
         Node[] subIdents = [];
+        auto pos = front.pos;
 
         if (next.type == Type.LParen)
             subIdents ~= parseCallExpr();
@@ -955,10 +992,11 @@ private:
             {
                 case Dot:
                     pop(Dot);
+                    auto posStr = front.pos;
                     if (next.type == Type.LParen)
                         subIdents ~= parseCallExpr();
                     else
-                        subIdents ~= new StringNode(pop(Ident).value);
+                        subIdents ~= new StringNode(posStr, pop(Ident).value);
                     break;
                 case LSParen:
                     pop(LSParen);
@@ -966,7 +1004,7 @@ private:
                     pop(RSParen);
                     break;
                 default:
-                    return new IdentNode(name, subIdents);
+                    return new IdentNode(pos, name, subIdents);
             }
         }
     }
@@ -974,12 +1012,14 @@ private:
 
     IdentNode parseCallIdent()
     {
-        return new IdentNode("", [parseCallExpr()]);
+        auto pos = front.pos;
+        return new IdentNode(pos, "", [parseCallExpr()]);
     }
 
 
     DictNode parseCallExpr()
     {
+        auto pos = front.pos;
         string name = pop(Type.Ident).value;
         Node[] varargs;
         Node[string] kwargs;
@@ -1014,11 +1054,11 @@ private:
         }
 
         Node[string] callDict;
-        callDict["name"] = new StringNode(name);
-        callDict["varargs"] = new ListNode(varargs);
-        callDict["kwargs"] = new DictNode(kwargs);
+        callDict["name"] = new StringNode(pos, name);
+        callDict["varargs"] = new ListNode(pos, varargs);
+        callDict["kwargs"] = new DictNode(pos, kwargs);
 
-        return new DictNode(callDict);
+        return new DictNode(pos, callDict);
     }
 
     /**
@@ -1026,17 +1066,19 @@ private:
       */
     Node parseLiteral()
     {
+        auto pos = front.pos;
         switch (front.type) with (Type)
         {
-            case Integer: return new NumNode(pop.value.to!long);
-            case Float:   return new NumNode(pop.value.to!double);
-            case String:  return new StringNode(pop.value);
-            case Boolean: return new BooleanNode(pop.value.to!bool);
+            case Integer: return new NumNode(pos, pop.value.to!long);
+            case Float:   return new NumNode(pos, pop.value.to!double);
+            case String:  return new StringNode(pos, pop.value);
+            case Boolean: return new BooleanNode(pos, pop.value.to!bool);
             case LParen:  return parseTuple();
             case LSParen: return parseList();
             case LBrace:  return parseDict();
             default:
-                throw new JinjaParserException("Unexpected token while parsing expression: %s".fmt(front.value));
+                assertJinja(0, "Unexpected token while parsing expression: %s(%s)".fmt(front.type, front.value), front.pos);
+                assert(0);
         }
     }
 
@@ -1045,21 +1087,23 @@ private:
     {
         //Literally array right now
 
+        auto pos = front.pos;
         pop(Type.LParen);
         auto tuple = parseSequenceOf!parseHighLevelExpression(Type.RParen);
         pop(Type.RParen);
 
-        return new ListNode(tuple);
+        return new ListNode(pos, tuple);
     }
 
 
     Node parseList()
     {
+        auto pos = front.pos;
         pop(Type.LSParen);
         auto list = parseSequenceOf!parseHighLevelExpression(Type.RSParen);
         pop(Type.RSParen);
 
-        return new ListNode(list);
+        return new ListNode(pos, list);
     }
 
 
@@ -1093,6 +1137,7 @@ private:
     Node parseDict()
     {
         Node[string] dict;
+        auto pos = front.pos;
 
         pop(Type.LBrace);
 
@@ -1118,7 +1163,7 @@ private:
 
         pop(Type.RBrace);
 
-        return new DictNode(dict);
+        return new DictNode(pos, dict);
     }
 
 
@@ -1135,14 +1180,14 @@ private:
     {
         if (_tokens.length)
             return _tokens[0];
-        return Token(Type.EOF);
+        return Token.EOF;
     }
 
     Token next()
     {
         if (_tokens.length > 1)
             return _tokens[1];
-        return Token(Type.EOF);
+        return Token.EOF;
     }
 
 
@@ -1158,7 +1203,7 @@ private:
     Token pop(Type t)
     {
         if (front.type != t)
-            throw new JinjaParserException("Unexpected token %s, expected: %s".fmt(front.value, t));
+            assertJinja(0, "Unexpected token %s(%s), expected: `%s`".fmt(front.type, front.value, t), front.pos);
         return pop();
     }
 
@@ -1166,7 +1211,7 @@ private:
     Token pop(Keyword kw)
     {
         if (front.type != Type.Keyword || front.value != kw)
-            throw new JinjaParserException("Unexpected token %s, expected kw: %s".fmt(front.value, kw));
+            assertJinja(0, "Unexpected token %s(%s), expected kw: %s".fmt(front.type, front.value, kw), front.pos);
         return pop();
     }
 
@@ -1174,7 +1219,7 @@ private:
     Token pop(Operator op)
     {
         if (front.type != Type.Operator || front.value != op)
-            throw new JinjaParserException("Unexpected token %s, expected op: %s".fmt(front.value, op));
+            assertJinja(0, "Unexpected token %s(%s), expected op: %s".fmt(front.type, front.value, op), front.pos);
         return pop();
     }
 
@@ -1231,7 +1276,7 @@ string stripOnceRight(string str)
     bool stripped = false;
     foreach_reverse (i, dchar c; str)
     {
-        if (!isWhite(c) || c == '\n')
+        if (!isWhite(c) || c == '\n' || c == '\r' || c == 0x2028 || c == 0x2029)
             return str[0 .. i + codeLength!C(c)];
     }
 

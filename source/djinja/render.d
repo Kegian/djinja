@@ -104,7 +104,7 @@ class Context
         if (name in data)
             return &(data[name]);
         if (prev is null)
-            throw new JinjaRenderException("Non declared var `%s`".fmt(name));
+            assertJinja(0, "Non declared var `%s`".fmt(name));
         return prev.getPtr(name);
     }
     
@@ -129,7 +129,7 @@ class Context
         if (name in functions)
             return functions[name];
         if (prev is null)
-            throw new JinjaRenderException("Non declared function `%s`".fmt(name));
+            assertJinja(0, "Non declared function `%s`".fmt(name));
         return prev.getFunc(name);
     }
 
@@ -149,7 +149,7 @@ class Context
         if (name in macros)
             return macros[name];
         if (prev is null)
-            throw new JinjaRenderException("Non declared macro `%s`".fmt(name));
+            assertJinja(0, "Non declared macro `%s`".fmt(name));
         return prev.getMacro(name);
     }
 }
@@ -323,7 +323,8 @@ class Render : IVisitor
             else if (_context.hasMacro(name))
                 return visitMacro(name, args);
             else
-                throw new JinjaRenderException("Undefined " ~ type ~ " %s".fmt(name));
+                assertJinja(0, "Undefined " ~ type ~ " %s".fmt(name), node.pos);
+            assert(0);
         }
         
         UniNode calcFilter()
@@ -417,6 +418,7 @@ class Render : IVisitor
         else
             curr = UniNode(null);
 
+        auto lastPos = node.pos;
         foreach (sub; node.subIdents)
         {
             tryAccept(sub);
@@ -427,11 +429,11 @@ class Render : IVisitor
                 // Index of list/tuple
                 case integer:
                 case uinteger:
-                    curr.checkNodeType(array);
+                    curr.checkNodeType(array, lastPos);
                     if (key.get!long < curr.length)
                         curr = curr[key.get!long];
                     else
-                        throw new JinjaRenderException("Range violation  on %s...[%d]".fmt(node.name, key.get!long));
+                        assertJinja(0, "Range violation  on %s...[%d]".fmt(node.name, key.get!long), sub.pos);
                     break;
 
                 // Key of dict
@@ -458,7 +460,10 @@ class Render : IVisitor
                         curr = visitMacro(keyStr, UniNode(args));
                     }
                     else
-                        throw new JinjaRenderException("Unknown attribute %s".fmt(key.get!string));
+                    {
+                        curr.checkNodeType(object, lastPos);
+                        assertJinja(0, "Unknown attribute %s".fmt(key.get!string), sub.pos);
+                    }
                     break;
 
                 // Call of function
@@ -477,13 +482,14 @@ class Render : IVisitor
                         curr = visitMacro(name, key);
                     }
                     else
-                        throw new JinjaRenderException("Not found any macro, function or filter `%s`".fmt(name));
+                        assertJinja(0, "Not found any macro, function or filter `%s`".fmt(name), sub.pos);
                     break;
 
                 default:
-                    throw new JinjaRenderException("Unknown attribute %s for %s".fmt(key.toString, node.name));
+                    assertJinja(0, "Unknown attribute %s for %s".fmt(key.toString, node.name), sub.pos);
             }
-
+            
+            lastPos = sub.pos;
         }
 
         push(curr);
@@ -497,7 +503,7 @@ class Render : IVisitor
         if (!_context.has(node.name))
         {
             if (node.subIdents.length)
-                throw new JinjaRenderException("Unknow variable %s".fmt(node.name));
+                assertJinja(0, "Unknow variable %s".fmt(node.name), node.pos);
             _context.data[node.name] = expr;
             return;
         }
@@ -510,6 +516,7 @@ class Render : IVisitor
             return;
         }
 
+        auto lastPos = node.pos;
         for(int i = 0; i < cast(long)(node.subIdents.length) - 1; i++)
         {
             tryAccept(node.subIdents[i]);
@@ -520,24 +527,26 @@ class Render : IVisitor
                 // Index of list/tuple
                 case integer:
                 case uinteger:
-                    checkNodeType(*curr, array);
+                    checkNodeType(*curr, array, lastPos);
                     if (key.get!long < curr.length)
                         curr = &((*curr)[key.get!long]);
                     else
-                        throw new JinjaRenderException("Range violation  on %s...[%d]".fmt(node.name, key.get!long));
+                        assertJinja(0, "Range violation  on %s...[%d]".fmt(node.name, key.get!long), node.subIdents[i].pos);
                     break;
 
                 // Key of dict
                 case text:
+                    checkNodeType(*curr, object, lastPos);
                     if (key.get!string in *curr)
                         curr = &((*curr)[key.get!string]);
                     else
-                        throw new JinjaRenderException("Unknown attribute %s".fmt(key.get!string));
+                        assertJinja(0, "Unknown attribute %s".fmt(key.get!string), node.subIdents[i].pos);
                     break;
 
                 default:
-                    throw new JinjaRenderException("Unknown attribute %s for %s".fmt(key.toString, node.name));
+                    assertJinja(0, "Unknown attribute %s for %s".fmt(key.toString, node.name), node.subIdents[i].pos);
             }
+            lastPos = node.subIdents[i].pos;
         }
 
         if (node.subIdents.length)
@@ -550,20 +559,21 @@ class Render : IVisitor
                 // Index of list/tuple
                 case integer:
                 case uinteger:
-                    checkNodeType(*curr, array);
+                    checkNodeType(*curr, array, lastPos);
                     if (key.get!long < curr.length)
                         (*curr).opIndex(key.get!long) = expr; // ¯\_(ツ)_/¯
                     else
-                        throw new JinjaRenderException("Range violation  on %s...[%d]".fmt(node.name, key.get!long));
+                        assertJinja(0, "Range violation  on %s...[%d]".fmt(node.name, key.get!long), node.subIdents[$-1].pos);
                     break;
 
                 // Key of dict
                 case text:
+                    checkNodeType(*curr, object, lastPos);
                     (*curr)[key.get!string] = expr;
                     break;
 
                 default:
-                    throw new JinjaRenderException("Unknown attribute %s for %s".fmt(key.toString, node.name));
+                    assertJinja(0, "Unknown attribute %s for %s".fmt(key.toString, node.name, node.subIdents[$-1].pos));
             }
         }
     }
@@ -663,8 +673,8 @@ class Render : IVisitor
                         _context.data[node.keys[0]] = iterable[i];
                     else
                     {
-                        iterable[i].checkNodeType(UniNode.Kind.array);
-                        assertJinja(iterable[i].length >= node.keys.length, "Num of keys less then values");
+                        iterable[i].checkNodeType(UniNode.Kind.array, node.iterable.pos);
+                        assertJinja(iterable[i].length >= node.keys.length, "Num of keys less then values", node.iterable.pos);
                         foreach(j, key; node.keys)
                             _context.data[key] = iterable[i][j];
                     }
@@ -700,8 +710,8 @@ class Render : IVisitor
                     _context.data[node.keys[0]] = iterable[i];
                 else
                 {
-                    iterable[i].checkNodeType(UniNode.Kind.array);
-                    assertJinja(iterable[i].length >= node.keys.length, "Num of keys less then values");
+                    iterable[i].checkNodeType(UniNode.Kind.array, node.iterable.pos);
+                    assertJinja(iterable[i].length >= node.keys.length, "Num of keys less then values", node.iterable.pos);
                     foreach(j, key; node.keys)
                         _context.data[key] = iterable[i][j];
                 }
@@ -733,10 +743,10 @@ class Render : IVisitor
         else
         {
             auto expr = pop();
-            expr.checkNodeType(UniNode.Kind.array);
+            expr.checkNodeType(UniNode.Kind.array, node.expr.pos);
             
             if (expr.length < node.assigns.length)
-                throw new JinjaRenderException("Iterable length less then number of assigns");
+                assertJinja(0, "Iterable length less then number of assigns", node.expr.pos);
 
             foreach(idx, assign; node.assigns)
             {
@@ -831,7 +841,7 @@ class Render : IVisitor
         if (node.macrosNames.length)
             foreach (name; node.macrosNames)
             {
-                assertJinja(cast(bool)(name.was in macros), "Undefined macro `%s` in `%s`".fmt(name.was, node.fileName));
+                assertJinja(cast(bool)(name.was in macros), "Undefined macro `%s` in `%s`".fmt(name.was, node.fileName), node.pos);
                 _context.macros[name.become] = macros[name.was];
             }
         else
@@ -917,7 +927,7 @@ private:
 
         foreach(arg; macro_.args)
             if (arg.name !in _context.data)
-                throw new JinjaRenderException("Missing value for argument `%s`".fmt(arg.name));
+                assertJinja(0, "Missing value for argument `%s` in macro `%s`".fmt(arg.name, name));
 
         if (!caller.isNull)
             _context.macros["caller"] = caller;
@@ -987,7 +997,7 @@ private:
     UniNode pop()
     {
         if (!_dataStack.length)
-            throw new JinjaRenderException("Unexpected empty stack");
+            assertJinja(0, "Unexpected empty stack");
 
         auto un = _dataStack.back;
         _dataStack.popBack;
@@ -1004,7 +1014,7 @@ private:
     void popFilter()
     {
         if (!_appliedFilters.length)
-            throw new JinjaRenderException("Unexpected empty filter stack");
+            assertJinja(0, "Unexpected empty filter stack");
 
         _appliedFilters.popBack;
     }

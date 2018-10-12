@@ -219,28 +219,37 @@ bool isIdentOperator(Operator op)()
 }
 
 
-struct TokenPos
+struct Position
 {
     string filename;
     ulong line, column;
+
+    string toString()
+    {
+        return filename ~ "(" ~ line.to!string ~ "," ~ column.to!string ~ ")";
+    }
 }
 
 
 struct Token
 {
+    enum EOF = Token(Type.EOF, Position("", 0, 0));
+
     Type type;
-
     string value;
+    Position pos;
 
-    this (Type t)
+    this (Type t, Position p)
     {
         type = t;
+        pos = p;
     }
 
-    this(Type t, string v)
+    this(Type t, string v, Position p)
     {
         type = t;
         value = v;
+        pos = p;
     }
 
     bool opEquals(Type type){
@@ -283,6 +292,7 @@ struct Lexer(
 
     private
     {
+        Position _beginPos;
         bool _isReadingRaw; // State of reading raw data
         bool _isInlineStmt; // State of reading inline statement
         string _str;
@@ -296,27 +306,33 @@ struct Lexer(
         _isReadingRaw = true;
         _isInlineStmt = false;
         _filename = filename;
+        _line = 1;
+        _column = 1;
     }
 
     Token nextToken()
     {
+        _beginPos = position();
+
         // Try to read raw data
         if (_isReadingRaw)
         {
             auto raw = skipRaw();
             _isReadingRaw = false;
             if (raw.length)
-                return Token(Type.Raw, raw);
+                return Token(Type.Raw, raw, _beginPos);
         }
 
         skipWhitespaces();
+        _beginPos = position();
 
         // Check inline statement end
-        if (_isInlineStmt && tryToSkipNewLine())
+        if (_isInlineStmt &&
+            (tryToSkipNewLine() || cmntOpInline == sliceOp!cmntOpInline))
         {
             _isInlineStmt = false;
             _isReadingRaw = true;
-            return Token(Type.StmtEnd, "\n");
+            return Token(Type.StmtEnd, "\n", _beginPos);
         }
 
         // Allow multiline inline statements with '\'
@@ -326,64 +342,65 @@ struct Lexer(
             {
                 pop();
                 if (!tryToSkipNewLine())
-                    return Token(Type.Unknown, "\\");
+                    return Token(Type.Unknown, "\\", _beginPos);
             }
             else
                 break;
 
             skipWhitespaces();
+            _beginPos = position();
         }
 
         // Check begin operators
-        if (exprOpBegin == slice(exprOpBegin.length))
+        if (exprOpBegin == sliceOp!exprOpBegin)
         {
-            skip(exprOpBegin.length);
-            return Token(Type.ExprBegin, exprOpBegin);
+            skipOp!exprOpBegin;
+            return Token(Type.ExprBegin, exprOpBegin, _beginPos);
         }
-        if (stmtOpBegin == slice(stmtOpBegin.length))
+        if (stmtOpBegin == sliceOp!stmtOpBegin)
         {
-            skip(stmtOpBegin.length);
-            return Token(Type.StmtBegin, stmtOpBegin);
+            skipOp!stmtOpBegin;
+            return Token(Type.StmtBegin, stmtOpBegin, _beginPos);
         }
-        if (cmntOpBegin == slice(cmntOpBegin.length))
+        if (cmntOpBegin == sliceOp!cmntOpBegin)
         {
-            skip(cmntOpBegin.length);
+            skipOp!cmntOpBegin;
             skipComment();
-            return Token(Type.CmntBegin, cmntOpBegin);
+            return Token(Type.CmntBegin, cmntOpBegin, _beginPos);
         }
 
         // Check end operators
-        if (exprOpEnd == slice(exprOpEnd.length))
+        if (exprOpEnd == sliceOp!exprOpEnd)
         {
             _isReadingRaw = true;
-            skip(exprOpEnd.length);
-            return Token(Type.ExprEnd, exprOpEnd);
+            skipOp!exprOpEnd;
+            return Token(Type.ExprEnd, exprOpEnd, _beginPos);
         }
-        if (stmtOpEnd == slice(stmtOpEnd.length))
+        if (stmtOpEnd == sliceOp!stmtOpEnd)
         {
             _isReadingRaw = true;
-            skip(stmtOpEnd.length);
-            return Token(Type.StmtEnd, stmtOpEnd);
+            skipOp!stmtOpEnd;
+            return Token(Type.StmtEnd, stmtOpEnd, _beginPos);
         }
-        if (cmntOpEnd == slice(cmntOpEnd.length))
+        if (cmntOpEnd == sliceOp!cmntOpEnd)
         {
             _isReadingRaw = true;
-            skip(cmntOpEnd.length);
-            return Token(Type.CmntEnd, cmntOpEnd);
+            skipOp!cmntOpEnd;
+            return Token(Type.CmntEnd, cmntOpEnd, _beginPos);
         }
 
         // Check begin inline operators
-        if (cmntOpInline == slice(cmntOpInline.length))
+        if (cmntOpInline == sliceOp!cmntOpInline)
         {
             skipInlineComment();
             _isReadingRaw = true;
-            return Token(Type.CmntInline);
+            return Token(Type.CmntInline, cmntOpInline, _beginPos);
         }
-        if (stmtOpInline == slice(stmtOpInline.length))
+        if (stmtOpInline == sliceOp!stmtOpInline)
         {
-            skip(stmtOpInline.length);
+            skipOp!stmtOpInline;
             _isInlineStmt = true;
-            return Token(Type.StmtBegin, stmtOpInline);
+            return Token(Type.StmtBegin, stmtOpInline, _beginPos);
         }
 
         // Trying to read non-ident operators
@@ -391,10 +408,10 @@ struct Lexer(
         {
             static if (!isIdentOperator!op)
             {
-                if (cast(string)op == slice(op.length))
+                if (cast(string)op == sliceOp!op)
                 {
-                    skip(op.length);
-                    return Token(Type.Operator, op);
+                    skipOp!op;
+                    return Token(Type.Operator, op, _beginPos);
                 }
             }
         }
@@ -404,7 +421,7 @@ struct Lexer(
         {
             // End of file
             case EOF:
-                return Token(Type.EOF);
+                return Token(Type.EOF, _beginPos);
 
 
             // Identifier or keyword
@@ -413,35 +430,35 @@ struct Lexer(
             case '_':
                 auto ident = popIdent();
                 if (ident.toKeyword != Keyword.Unknown)
-                    return Token(Type.Keyword, ident);
+                    return Token(Type.Keyword, ident, _beginPos);
                 else if (ident.isBoolean)
-                    return Token(Type.Boolean, ident);
+                    return Token(Type.Boolean, ident, _beginPos);
                 else if (ident.isOperator)
-                    return Token(Type.Operator, ident);
+                    return Token(Type.Operator, ident, _beginPos);
                 else
-                    return Token(Type.Ident, ident);
+                    return Token(Type.Ident, ident, _beginPos);
 
             // Integer or float
             case '0': .. case '9':
-                return readNumber();
+                return popNumber();
 
             // String
             case '"':
             case '\'':
-                return Token(Type.String, popString());
+                return Token(Type.String, popString(), _beginPos);
                 
-            case '(': return Token(Type.LParen, popChar);
-            case ')': return Token(Type.RParen, popChar);
-            case '[': return Token(Type.LSParen, popChar);
-            case ']': return Token(Type.RSParen, popChar);
-            case '{': return Token(Type.LBrace, popChar);
-            case '}': return Token(Type.RBrace, popChar);
-            case '.': return Token(Type.Dot, popChar);
-            case ',': return Token(Type.Comma, popChar);
-            case ':': return Token(Type.Colon, popChar);
+            case '(': return Token(Type.LParen, popChar, _beginPos);
+            case ')': return Token(Type.RParen, popChar, _beginPos);
+            case '[': return Token(Type.LSParen, popChar, _beginPos);
+            case ']': return Token(Type.RSParen, popChar, _beginPos);
+            case '{': return Token(Type.LBrace, popChar, _beginPos);
+            case '}': return Token(Type.RBrace, popChar, _beginPos);
+            case '.': return Token(Type.Dot, popChar, _beginPos);
+            case ',': return Token(Type.Comma, popChar, _beginPos);
+            case ':': return Token(Type.Colon, popChar, _beginPos);
 
             default:
-                return Token(Type.Unknown, popChar);
+                return Token(Type.Unknown, popChar, _beginPos);
         }
     }
 
@@ -470,9 +487,18 @@ private:
     {
         if (_str.length > 0)
         {
-            auto prev  = _str.front;
+            auto ch  = _str.front;
+
+            if (ch.isNewLine && !(ch == '\r' && next == '\n'))
+            {
+                _line++;
+                _column = 1;
+            }
+            else
+                _column++;
+
             _str.popFront();
-            return prev;
+            return ch;
         } 
         else
             return EOF;
@@ -485,27 +511,32 @@ private:
     }
 
 
-    string slice(uint num)
+    string sliceOp(string op)()
     {
-        if (num >= _str.length)
+        enum length = op.walkLength;
+
+        if (length >= _str.length)
             return _str;
         else
-            return _str[0 .. num];
+            return _str[0 .. length];
     }
 
 
-    void skip(uint num)
+    void skipOp(string op)()
     {
-        if (num >= _str.length)
+        enum length = op.walkLength;
+
+        if (length >= _str.length)
             _str = "";
         else
-            _str = _str[num .. $];
+            _str = _str[length .. $];
+        _column += length;
     }
 
 
-    TokenPos position()
+    Position position()
     {
-        return TokenPos(_filename, _line, _column);
+        return Position(_filename, _line, _column);
     }
 
 
@@ -553,7 +584,7 @@ private:
     }
 
 
-    Token readNumber()
+    Token popNumber()
     {
         auto type = Type.Integer;
         string number = "";
@@ -572,13 +603,13 @@ private:
                         number ~= pop();
                     }
                     else
-                        return Token(type, number);
+                        return Token(type, number, _beginPos);
                     break;
                 case '_':
                     pop();
                     break;
                 default:
-                    return Token(type, number);
+                    return Token(type, number, _beginPos);
             }
         }
     }
@@ -616,15 +647,15 @@ private:
             if (front == EOF)
                 return raw;
 
-            if (exprOpBegin == slice(exprOpBegin.length))
+            if (exprOpBegin == sliceOp!exprOpBegin)
                 return raw;
-            if (stmtOpBegin == slice(stmtOpBegin.length))
+            if (stmtOpBegin == sliceOp!stmtOpBegin)
                 return raw;
-            if (cmntOpBegin == slice(cmntOpBegin.length))
+            if (cmntOpBegin == sliceOp!cmntOpBegin)
                 return raw;
-            if (stmtOpInline == slice(stmtOpInline.length))
+            if (stmtOpInline == sliceOp!stmtOpInline)
                 return raw;
-            if (cmntOpInline == slice(cmntOpInline.length))
+            if (cmntOpInline == sliceOp!cmntOpInline)
                 return raw;
             
             raw ~= pop();
@@ -636,7 +667,7 @@ private:
     {
         while(front != EOF)
         {
-            if (cmntOpEnd == slice(cmntOpEnd.length))
+            if (cmntOpEnd == sliceOp!cmntOpEnd)
                 return;
             pop();
         }
@@ -691,4 +722,9 @@ bool isWhiteSpace(dchar ch)
 {
     return ch == ' ' || ch == '\t' || ch == 0x205F || ch == 0x202F || ch == 0x3000
            || ch == 0x00A0 || (ch >= 0x2002 && ch <= 0x200B);
+}
+
+bool isNewLine(dchar ch)
+{
+    return ch == '\r' || ch == '\n' || ch == 0x2028 || ch == 0x2029;
 }

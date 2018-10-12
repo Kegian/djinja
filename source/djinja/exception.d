@@ -1,5 +1,10 @@
 module djinja.exception;
 
+private
+{
+    import djinja.lexer : Position;
+}
+
 
 class JinjaException : Exception
 {
@@ -40,10 +45,15 @@ class JinjaRenderException : JinjaException
 }
 
 
-void assertJinja(E : JinjaException)(bool expr, string msg = "", string file = __FILE__, size_t line = __LINE__)
+void assertJinja(E : JinjaException)(bool expr, string msg = "", Position pos = Position.init, string file = __FILE__, size_t line = __LINE__)
 {
     if (!expr)
-        throw new JinjaException(msg, file, line);
+    {
+        if (pos == Position.init)
+            throw new E(msg, file, line);
+        else
+            throw new E(pos.toString ~ ": " ~ msg, file, line); 
+    }
 }
 
 

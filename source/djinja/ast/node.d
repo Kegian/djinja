@@ -3,6 +3,7 @@ module djinja.ast.node;
 public
 {
     import std.typecons : Nullable, nullable;
+    import djinja.lexer : Position;
 }
 
 private
@@ -61,6 +62,8 @@ mixin template AcceptVisitor()
 
 abstract class Node : INode
 {
+    public Position pos;
+
     void accept(IVisitor visitor) {}
 }
 
@@ -70,8 +73,9 @@ class TemplateNode : Node
     Nullable!StmtBlockNode stmt;
     BlockNode[string] blocks;
 
-    this(StmtBlockNode stmt, BlockNode[string] blocks)
+    this(Position pos, StmtBlockNode stmt, BlockNode[string] blocks)
     {
+        this.pos = pos;
         this.stmt = stmt.toNullable;
         this.blocks = blocks;
     }
@@ -86,8 +90,9 @@ class BlockNode : Node
     string name;
     Nullable!Node stmt;
 
-    this(string name, Node stmt)
+    this(Position pos, string name, Node stmt)
     {
+        this.pos = pos;
         this.name = name;
         this.stmt = stmt.toNullable;
     }
@@ -101,7 +106,10 @@ class StmtBlockNode : Node
 {
     Node[] children;
 
-    this() {}
+    this(Position pos)
+    {
+        this.pos = pos;
+    }
 
     mixin AcceptVisitor;
 }
@@ -112,8 +120,9 @@ class RawNode : Node
 {
     string raw;
 
-    this(string raw)
+    this(Position pos, string raw)
     {
+        this.pos = pos;
         this.raw = raw;
     }
 
@@ -126,8 +135,9 @@ class ExprNode : Node
 {
     Nullable!Node expr;
 
-    this (Node expr)
+    this(Position pos, Node expr)
     {
+        this.pos = pos;
         this.expr = expr.toNullable;
     }
 
@@ -139,8 +149,9 @@ class InlineIfNode : Node
 {
     Nullable!Node expr, cond, other;
 
-    this (Node expr, Node cond, Node other)
+    this(Position pos, Node expr, Node cond, Node other)
     {
+        this.pos = pos;
         this.expr = expr.toNullable;
         this.cond = cond.toNullable;
         this.other = other.toNullable;
@@ -155,8 +166,9 @@ class BinOpNode : Node
     string op;
     Node lhs, rhs;
 
-    this (string op, Node lhs, Node rhs)
+    this(Position pos, string op, Node lhs, Node rhs)
     {
+        this.pos = pos;
         this.op = op;
         this.lhs = lhs;
         this.rhs = rhs;
@@ -171,8 +183,9 @@ class UnaryOpNode : Node
     string op;
     Node expr;
 
-    this (string op, Node expr)
+    this(Position pos, string op, Node expr)
     {
+        this.pos = pos;
         this.op = op;
         this.expr = expr;
     }
@@ -198,14 +211,16 @@ class NumNode : Node
     Data data;
     Type type;
 
-    this (long num)
+    this(Position pos, long num)
     {
+        this.pos = pos;
         data._integer = num;
         type = Type.Integer;
     }
 
-    this (double num)
+    this(Position pos, double num)
     {
+        this.pos = pos;
         data._float = num;
         type = Type.Float;
     }
@@ -218,8 +233,9 @@ class BooleanNode : Node
 {
     bool boolean;
 
-    this(bool boolean)
+    this(Position pos, bool boolean)
     {
+        this.pos = pos;
         this.boolean = boolean;
     }
 
@@ -239,8 +255,9 @@ class IdentNode : Node
     Node[] subIdents;
 
 
-    this(string name, Node[] subIdents)
+    this(Position pos, string name, Node[] subIdents)
     {
+        this.pos = pos;
         this.name = name;
         this.subIdents = subIdents;
     }
@@ -255,8 +272,9 @@ class AssignableNode : Node
     Node[] subIdents;
 
 
-    this(string name, Node[] subIdents)
+    this(Position pos, string name, Node[] subIdents)
     {
+        this.pos = pos;
         this.name = name;
         this.subIdents = subIdents;
     }
@@ -269,8 +287,9 @@ class IfNode : Node
 {
     Node cond, then, other;
 
-    this(Node cond, Node then, Node other)
+    this(Position pos, Node cond, Node then, Node other)
     {
+        this.pos = pos;
         this.cond = cond;
         this.then = then;
         this.other = other;
@@ -289,8 +308,9 @@ class ForNode : Node
     Nullable!Node cond;
     bool isRecursive;
 
-    this(string[] keys, Node iterable, Node block, Node other, Node cond, bool isRecursive)
+    this(Position pos, string[] keys, Node iterable, Node block, Node other, Node cond, bool isRecursive)
     {
+        this.pos = pos;
         this.keys = keys;
         this.iterable = iterable.toNullable;
         this.block = block.toNullable;
@@ -307,8 +327,9 @@ class StringNode : Node
 {
     string str;
 
-    this(string str)
+    this(Position pos, string str)
     {
+        this.pos = pos;
         this.str = str;
     }
 
@@ -320,8 +341,9 @@ class ListNode : Node
 {
     Node[] list;
 
-    this(Node[] list)
+    this(Position pos, Node[] list)
     {
+        this.pos = pos;
         this.list = list;
     }
 
@@ -333,8 +355,9 @@ class DictNode : Node
 {
     Node[string] dict;
 
-    this(Node[string] dict)
+    this(Position pos, Node[string] dict)
     {
+        this.pos = pos;
         this.dict = dict;
     }
 
@@ -347,8 +370,9 @@ class SetNode : Node
     Node[] assigns;
     Node expr;
 
-    this(Node[] assigns, Node expr)
+    this(Position pos, Node[] assigns, Node expr)
     {
+        this.pos = pos;
         this.assigns = assigns;
         this.expr = expr;
     }
@@ -364,8 +388,9 @@ class MacroNode : Node
     Nullable!Node block;
     bool isReturn;
 
-    this(string name, Arg[] args, Node block, bool isReturn)
+    this(Position pos, string name, Arg[] args, Node block, bool isReturn)
     {
+        this.pos = pos;
         this.name = name;
         this.args = args;
         this.block = block.toNullable;
@@ -383,8 +408,9 @@ class CallNode : Node
     Nullable!Node factArgs;
     Nullable!Node block;
 
-    this(string macroName, Arg[] formArgs, Node factArgs, Node block)
+    this(Position pos, string macroName, Arg[] formArgs, Node factArgs, Node block)
     {
+        this.pos = pos;
         this.macroName = macroName;
         this.formArgs = formArgs;
         this.factArgs = factArgs.toNullable;
@@ -401,8 +427,9 @@ class FilterBlockNode : Node
     Nullable!Node args;
     Nullable!Node block;
 
-    this(string filterName, Node args, Node block)
+    this(Position pos, string filterName, Node args, Node block)
     {
+        this.pos = pos;
         this.filterName = filterName;
         this.args = args.toNullable;
         this.block = block.toNullable;
@@ -425,8 +452,9 @@ class ImportNode : Node
     Nullable!TemplateNode tmplBlock;
     bool withContext;
 
-    this(string fileName, Rename[] macrosNames, TemplateNode tmplBlock, bool withContext)
+    this(Position pos, string fileName, Rename[] macrosNames, TemplateNode tmplBlock, bool withContext)
     {
+        this.pos = pos;
         this.fileName = fileName;
         this.macrosNames = macrosNames;
         this.tmplBlock = tmplBlock.toNullable;
@@ -444,8 +472,9 @@ class IncludeNode : Node
     Nullable!TemplateNode tmplBlock;
     bool withContext;
 
-    this(string fileName, TemplateNode tmplBlock, bool withContext)
+    this(Position pos, string fileName, TemplateNode tmplBlock, bool withContext)
     {
+        this.pos = pos;
         this.fileName = fileName;
         this.tmplBlock = tmplBlock.toNullable;
         this.withContext = withContext;
@@ -461,8 +490,9 @@ class ExtendsNode : Node
     string fileName;
     Nullable!TemplateNode tmplBlock;
 
-    this(string fileName, TemplateNode tmplBlock)
+    this(Position pos, string fileName, TemplateNode tmplBlock)
     {
+        this.pos = pos;
         this.fileName = fileName;
         this.tmplBlock = tmplBlock.toNullable;
     }

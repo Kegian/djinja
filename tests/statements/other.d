@@ -39,7 +39,7 @@ unittest
 unittest
 {
     assertRender(
-`        # macro bubbleSort(l)
+`        # macro bubbleSort(l) ## comment
             # for i in l.length.range
                 # for j in range(l.length - i - 1)
                     # if l[j] > l[j + 1]
@@ -47,7 +47,7 @@ unittest
                     # endif
                 # endfor
             # endfor
-        # endmacro return l
+        # endmacro return l ## inline comment
 
         #- set list = [5,4,3,2,1,0] -
 
