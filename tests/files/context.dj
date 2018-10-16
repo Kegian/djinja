@@ -1,0 +1,7 @@
+## Checking context behavior
+
+{%- macro print_a -%}
+    {{ a }}
+{%- endmacro -%}
+
+{{ a }}

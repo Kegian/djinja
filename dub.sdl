@@ -5,7 +5,7 @@ authors "Maxim Tyapkin"
 copyright "Copyright © 2018, Maxim Tyapkin"
 license "BSD 3-clause"
 
-dependency "uninode" version="~>0.0.1-beta.3"
+dependency "uninode" version="~>0.0.1-beta.4"
 
 configuration "library" {
     targetType "library"
@@ -16,6 +16,8 @@ configuration "library" {
 configuration "unittest" {
     targetType "library"
     targetPath "out/tests"
+
+    stringImportPaths "./tests/files/"
 
     versions "UnitTestVersion"
     sourcePaths "tests"

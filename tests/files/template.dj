@@ -1,0 +1,13 @@
+BASE_RAW_DATA
+
+{%- block top -%}
+    BASE_TOP
+{%- endblock -%}
+
+{%- block super -%}
+    BASE_SUPER
+{%- endblock -%}
+
+{%- block bottom -%}
+    BASE_BOTTOM
+{%- endblock bottom -%}

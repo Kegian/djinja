@@ -8,7 +8,7 @@ private
 
 private struct Dummy
 {
-    int num;
+    int    num;
     string str;
     long[] list;
 }

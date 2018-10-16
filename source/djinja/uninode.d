@@ -97,7 +97,6 @@ void toCommonNumType(ref UniNode n1, ref UniNode n2)
 
 void toCommonCmpType(ref UniNode n1, ref UniNode n2)
 {
-    //TODO string, list, tuple, dict
    if (n1.isNumericNode && n2.isNumericNode)
    {
        toCommonNumType(n1, n2);

@@ -39,7 +39,7 @@ unittest
 unittest
 {
     assertRender(
-`        # macro bubbleSort(l) ## comment
+`       # macro bubbleSort(l) ## comment
             # for i in l.length.range
                 # for j in range(l.length - i - 1)
                     # if l[j] > l[j + 1]
@@ -58,7 +58,9 @@ unittest
     assertRender(
 `# set a = [\
             1, \
+               \
             2, \
+               \
             3, \
           ] 
 {{ a }}`,

@@ -1,0 +1,11 @@
+{% macro test -%}
+    TEST
+{%- endmacro %}
+
+{% macro test1 -%}
+    TEST1
+{%- endmacro %}
+
+{% macro test2 -%}
+    TEST2
+{%- endmacro %}
