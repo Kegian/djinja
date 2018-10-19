@@ -1288,9 +1288,19 @@ string stripOnceRight(string str)
     bool stripped = false;
     foreach_reverse (i, dchar c; str)
     {
-        if (!isWhite(c) || c == '\n' || c == '\r' || c == 0x2028 || c == 0x2029)
+        if (!isWhite(c))
             return str[0 .. i + codeLength!C(c)];
+
+        if (c == '\n' || c == '\r' || c == 0x2028 || c == 0x2029)
+        {
+            return str[0 .. i];
+        }
     }
 
     return str[0 .. 0];
+}
+
+unittest
+{
+    assert(stripOnceRight("\n") == "", stripOnceRight("\n"));
 }
