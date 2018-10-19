@@ -152,6 +152,18 @@ It is possible to define macro inside another macro and inner macro has link to 
     {% endmcaro %}
 {% endmcaro %}
 ```
+```jinja
+{% set counter = 0 -%}
+
+{%- macro inc() -%}
+    {% set counter = counter + 1 %}
+{%- endmacro return counter -%}
+
+{{ inc() }} ## 1
+{{ inc() }} ## 2
+{{ inc() }} ## 3
+{{ inc() }} ## 4
+```
 
 
 ## Usage

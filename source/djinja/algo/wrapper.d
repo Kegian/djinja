@@ -133,7 +133,7 @@ template wrapper(alias F)
                     missedArgs ~= key;
 
             if (missedArgs.length)
-                assertJinja(0, "Missed values for args %s".fmt(missedArgs.join(", ")));
+                assertJinja(0, "Missed values for args `%s`".fmt(missedArgs.join(", ")));
 
             static if (is (RT == void))
             {

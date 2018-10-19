@@ -705,11 +705,15 @@ private:
 
     void skipInlineComment()
     {
+        auto column = _column;
+
         while(front != EOF)
         {
             if (front == '\n')
             {
-                pop();
+                // Eat new line if whole line is comment
+                if (column == 1)
+                    pop();
                 return;
             }
             pop();
