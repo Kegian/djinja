@@ -25,6 +25,8 @@ Function[string] globalFilters()
         [
             "default": wrapper!defaultVal,
             "d":       wrapper!defaultVal,
+            "escape":  wrapper!escape,
+            "e":       wrapper!escape,
             "upper":   wrapper!upper,
             "sort":    wrapper!sort,
             "keys":    wrapper!keys,
@@ -45,6 +47,28 @@ UniNode defaultVal(UniNode value, UniNode default_value = UniNode(""), bool bool
         return default_value;
 
     return value;
+}
+
+
+string escape(string s)
+{
+    import std.array : appender;
+
+    auto w = appender!string;
+    w.reserve(s.length);
+
+    foreach (char ch; s)
+        switch (ch)
+        {
+            case '&':  w.put("&amp;");  break;
+            case '\"': w.put("&quot;"); break;
+            case '\'': w.put("&apos;"); break;
+            case '<':  w.put("&lt;");   break;
+            case '>':  w.put("&gt;");   break;
+            default:   w.put(ch);       break;
+        }
+
+    return w.data;
 }
 
 
