@@ -638,7 +638,24 @@ private:
             if (front == EOF)
                 return str;
 
-            if (front == ch && prev != '\\')
+            if (front == '\\')
+            {
+                pop();
+                if (front != EOF)
+                {
+                    prev = pop();
+                    switch (prev)
+                    {
+                        case 'n': str ~= '\n'; break;
+                        case 'r': str ~= '\r'; break;
+                        case 't': str ~= '\t'; break;
+                        default: str ~= prev; break;
+                    }
+                }
+                continue;
+            }
+
+            if (front == ch)
             {
                 pop();
                 return str;
