@@ -11,13 +11,14 @@ configuration "library" {
     targetType "library"
     targetPath "out"
     targetName "djinja"
+    versions "UnitTestVersion"
+    sourcePaths "source"
+    importPaths "source"
 }
 
 configuration "unittest" {
     targetType "library"
     targetPath "out/tests"
-
-    stringImportPaths "./tests/files/"
 
     versions "UnitTestVersion"
     sourcePaths "tests"

@@ -1,3 +1,15 @@
+/**
+  * DJinja parser
+  *
+  * Copyright:
+  *     Copyright (c) 2018, Maxim Tyapkin.
+  * Authors:
+  *     Maxim Tyapkin
+  * License:
+  *     This software is licensed under the terms of the BSD 3-clause license.
+  *     The full terms of the license can be found in the LICENSE.md file.
+  */
+
 module djinja.parser;
 
 public
@@ -143,7 +155,7 @@ struct Parser(Lexer)
         // Prevent recursive imports
         _parsedFiles[path] = null;
         auto str = cast(string)read(path);
-        _parsedFiles[path] = parseTree(str);
+        _parsedFiles[path] = parseTree(str, path);
 
         return _parsedFiles[path];
     }

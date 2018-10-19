@@ -1,3 +1,15 @@
+/**
+  * Description of global functions
+  *
+  * Copyright:
+  *     Copyright (c) 2018, Maxim Tyapkin.
+  * Authors:
+  *     Maxim Tyapkin
+  * License:
+  *     This software is licensed under the terms of the BSD 3-clause license.
+  *     The full terms of the license can be found in the LICENSE.md file.
+  */
+
 module djinja.algo.functions;
 
 private
@@ -17,10 +29,10 @@ Function[string] globalFunctions()
         [
             "range": toDelegate(&range),
             "length": wrapper!length,
+            "count": wrapper!length,
             "namespace": wrapper!namespace,
         ];
 }
-
 
 
 UniNode range(UniNode params)

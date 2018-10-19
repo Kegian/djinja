@@ -1,5 +1,5 @@
 /**
-  * Package module for the Cron framework
+  * Package module for the Djina framework
   *
   * Copyright:
   *     Copyright (c) 2018, Maxim Tyapkin.
@@ -14,10 +14,10 @@ module djinja;
 
 public
 {
-    import djinja.ast;
+    // import djinja.ast;
     import djinja.djinja;
     import djinja.exception;
-    import djinja.lexer;
-    import djinja.parser;
-    import djinja.render;
+    // import djinja.lexer;
+    // import djinja.parser;
+    // import djinja.render;
 }
