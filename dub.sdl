@@ -1,6 +1,6 @@
 name "djinja"
 description "Implementing Jinja2 template engine on D language"
-homepage "ttps://github.com/Kegian/djinja"
+homepage "https://github.com/Kegian/djinja"
 authors "Maxim Tyapkin"
 copyright "Copyright © 2018, Maxim Tyapkin"
 license "BSD 3-clause"
