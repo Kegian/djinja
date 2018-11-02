@@ -130,7 +130,7 @@ Since macros can return value, you can use them as functions / filters / tests:
     {% endfor %}
 {% endmacro return sum %}
 
-{{ [0, 1, 2, 4] | sum | e }} ## 4
+{{ [0, 1, 2, 4] | sum | e }} ## 7
 ```
 
 ```jinja
