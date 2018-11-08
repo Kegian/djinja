@@ -50,8 +50,10 @@ unittest
     }
     auto val = Dummy("some string", [1,2,3], 2);
 
-    assertRender!(val)("{{ val }}", "{arr: [1, 2, 3], idx: 2, str: 'some string'}");
+    assertRender!(val)("{{ val | sort }}", "[['arr', [1, 2, 3]], ['idx', 2], ['str', 'some string']]");
     assertRender!(val)("{{ val.length }}", "3");
+
+    assertRender!(val)("{{ val.idx }}", "2");
 
     assertRender!(val)("{{ val.str }}", "some string");
     assertRender!(val)("{{ val['str'] }}", "some string");
