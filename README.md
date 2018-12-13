@@ -184,7 +184,7 @@ Rendering data from the template
 
 ###### renderFile
 ```d 
-string renderData(T...)(string path);
+string renderFile(T...)(string path);
 ```
 Rendering data from the file
 
